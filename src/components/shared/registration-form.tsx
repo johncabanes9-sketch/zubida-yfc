@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Info, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import type { EventItem } from "@/data/types";
 import { Button } from "@/components/ui/button";
-import { FakeQR } from "./fake-qr";
 
 const chapters = [
   "Pagadian City", "Molave", "Labangan", "Aurora", "Tukuran",
@@ -14,25 +13,68 @@ const chapters = [
 ];
 const shirtSizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 
+type Success = { registrationId: string; qr: string };
+
+async function postWithRetry(payload: Record<string, unknown>, tries = 3): Promise<Response> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fetch("/api/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      if (i === tries - 1) throw e; // only network errors reach here
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 export function RegistrationForm({ event }: { event: EventItem }) {
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState<null | string>(null);
+  const [done, setDone] = useState<Success | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (submitting || done) return; // guard against double submit
+    setError(null);
     setSubmitting(true);
-    // Simulate async request + registration ID generation
-    setTimeout(() => {
-      const id =
-        "ZYFC-" +
-        Math.random().toString(36).slice(2, 6).toUpperCase() +
-        "-" +
-        Math.floor(1000 + Math.random() * 9000);
+    const fd = new FormData(e.currentTarget);
+    const payload = {
+      event_id: event.id,
+      full_name: fd.get("fullName"),
+      nickname: fd.get("nickname") || "",
+      birthdate: fd.get("birthdate") || "",
+      age: fd.get("age"),
+      gender: fd.get("gender") || "",
+      email: fd.get("email"),
+      phone: fd.get("phone") || "",
+      chapter: fd.get("chapter"),
+      cluster: fd.get("cluster") || "",
+      parish: fd.get("parish") || "",
+      school: fd.get("school") || "",
+      emergency_contact: fd.get("emContact") || "",
+      emergency_number: fd.get("emNumber") || "",
+      medical_concerns: fd.get("medical") || "",
+      food_restrictions: fd.get("food") || "",
+      shirt_size: fd.get("shirt") || "",
+      transport_needed: fd.get("transport") === "on",
+      consent: fd.get("consent") === "on",
+      captchaToken: (fd.get("cf-turnstile-response") as string) || undefined,
+    };
+    try {
+      const res = await postWithRetry(payload);
+      const data = await res.json();
+      if (data.ok) setDone({ registrationId: data.registration_id, qr: data.qr });
+      else setError(data.message ?? "Something went wrong. Please try again.");
+    } catch {
+      setError("We couldn't reach the server. Please check your connection and try again.");
+    } finally {
       setSubmitting(false);
-      setDone(id);
-    }, 1200);
+    }
   };
 
   if (done) {
@@ -45,26 +87,30 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
           <CheckCircle2 className="h-9 w-9" />
         </div>
-        <h3 className="mt-5 font-display text-2xl font-semibold">You&apos;re on the list!</h3>
+        <h3 className="mt-5 font-display text-2xl font-semibold">You&apos;re registered!</h3>
         <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-          This is a preview of the registration experience. In the live system
-          you&apos;ll receive a confirmation email and this QR code becomes your
-          event pass.
+          Your slot for <strong>{event.name}</strong> is reserved (pending
+          approval). Save this QR code — it&apos;s your event pass. A confirmation
+          has been sent to your email.
         </p>
 
         <div className="mx-auto mt-6 w-fit rounded-3xl bg-white p-5 shadow-card dark:bg-midnight-800">
-          <FakeQR seed={done} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={done.qr} width={160} height={160} alt="Your registration QR code" className="mx-auto" />
           <p className="mt-3 text-xs uppercase tracking-wide text-muted">Registration ID</p>
           <p className="font-mono text-lg font-semibold text-royal-700 dark:text-gold-300">
-            {done}
+            {done.registrationId}
           </p>
         </div>
 
-        <div className="mx-auto mt-6 flex max-w-sm items-start gap-2 rounded-2xl bg-gold-500/10 p-4 text-left text-sm text-gold-700 dark:text-gold-300">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="mx-auto mt-6 flex max-w-sm items-start gap-2 rounded-2xl bg-royal-700/8 p-4 text-left text-sm text-muted dark:bg-white/5">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-royal-600 dark:text-gold-300" />
           <span>
-            Demo mode — live online registration for <strong>{event.name}</strong>{" "}
-            opens soon. No data was saved.
+            You can check your approval status anytime at{" "}
+            <a href="/registration-status" className="font-semibold text-royal-700 underline dark:text-gold-300">
+              /registration-status
+            </a>{" "}
+            using your ID and email.
           </span>
         </div>
       </motion.div>
@@ -131,6 +177,13 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         </span>
       </label>
 
+      {error && (
+        <div className="flex items-start gap-2 rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-400">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       <Button
         type="submit"
         size="lg"
@@ -144,7 +197,8 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         )}
       </Button>
       <p className="text-center text-xs text-muted">
-        Preview form — submitting generates a sample QR &amp; ID. No data is stored.
+        By registering you reserve a slot instantly — you&apos;ll get a QR pass and
+        a confirmation email.
       </p>
     </form>
   );

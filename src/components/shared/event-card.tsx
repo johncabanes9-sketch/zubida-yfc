@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EventModal } from "./event-modal";
 import { cn } from "@/lib/utils";
 import { Reveal } from "./reveal";
+import { LiveSlots } from "@/components/events/live-slots";
 
 const statusStyles: Record<EventItem["status"], string> = {
   Open: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
@@ -67,7 +68,13 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
                 <span className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5" /> {event.slotsTaken}/{event.slotsTotal} slots
                 </span>
-                <span>{event.status === "Open" ? `${event.slotsTotal - event.slotsTaken} left` : "—"}</span>
+                <span>
+                  {event.status === "Open" ? (
+                    <LiveSlots eventId={event.id} slotsTaken={event.slotsTaken} slotsTotal={event.slotsTotal} />
+                  ) : (
+                    "—"
+                  )}
+                </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-royal-700/10 dark:bg-white/10">
                 <div

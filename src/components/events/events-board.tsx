@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { CalendarX } from "lucide-react";
-import { events } from "@/data/events";
+import type { EventItem } from "@/data/types";
 import { EventCard } from "@/components/shared/event-card";
 import { cn } from "@/lib/utils";
 
 type TimeFilter = "Upcoming" | "Past" | "All";
 type ScopeFilter = "All" | "Provincial" | "Chapter";
 
-export function EventsBoard() {
+export function EventsBoard({ events }: { events: EventItem[] }) {
   const [time, setTime] = useState<TimeFilter>("Upcoming");
   const [scope, setScope] = useState<ScopeFilter>("All");
 

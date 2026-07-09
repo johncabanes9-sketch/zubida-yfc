@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { EventsBoard } from "@/components/events/events-board";
+import { getEvents } from "@/lib/data/events";
 
 export const metadata: Metadata = {
   title: "Events",
@@ -8,7 +9,10 @@ export const metadata: Metadata = {
     "Upcoming and past provincial and chapter activities of Zubida YFC — camps, conferences, seminars, and missions.",
 };
 
-export default function EventsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function EventsPage() {
+  const events = await getEvents();
   return (
     <>
       <PageHeader
@@ -17,7 +21,7 @@ export default function EventsPage() {
         subtitle="Provincial camps, conferences, Christian Life Seminars, and chapter missions — find your next encounter and register online."
       />
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <EventsBoard />
+        <EventsBoard events={events} />
       </section>
     </>
   );

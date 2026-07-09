@@ -1,10 +1,11 @@
 import { ArrowRight } from "lucide-react";
-import { events } from "@/data/events";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { EventCard } from "@/components/shared/event-card";
 import { ButtonLink } from "@/components/ui/button";
+import { getEvents } from "@/lib/data/events";
 
-export function EventsPreview() {
+export async function EventsPreview() {
+  const events = await getEvents();
   const upcoming = events
     .filter((e) => e.status !== "Finished")
     .slice(0, 3);
