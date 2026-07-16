@@ -4,14 +4,14 @@
 
 **Goal:** Give events real, uploadable, role-scoped images stored in Supabase Storage, rendered in a keyboard-accessible public carousel — the storage foundation every later content slice depends on.
 
-**Architecture:** A single public-read `media` bucket, written only through guarded server actions using the service-role client. An `event_images` table stores object *paths* (not URLs) with `sort_order`, and its RLS mirrors `events` ownership via a parent subquery so ownership cannot drift. `events.cover` is retained as the single-image fallback, so any event without uploads renders exactly as it does today.
+**Architecture:** A single public-read `media` bucket, written only through guarded server actions using the service-role client. An `event_images` table stores object *paths* (not URLs) with `sort_order`, and its RLS mirrors `events` ownership via a parent subquery so ownership cannot drift. `events.cover` is left completely untouched — it keeps driving `event-card.tsx` exactly as it does today; the carousel is additive and lives only in the modal, which renders no image at all today.
 
 **Tech Stack:** Next.js 15 (App Router, server actions), React 19, TypeScript, Supabase (Postgres + Storage), Zod, Tailwind. Migrations run via `npm run db:migrate` (a `pg`-based runner over `SUPABASE_DB_URL` — there is no Docker/`supabase` CLI here).
 
 ## Global Constraints
 
 - **Do not redesign the frontend.** No changes to layout, styling, animations, or routing. Preserve the existing visual identity.
-- **Do not remove or regress working features.** `events.cover` must keep working; events with no uploads must look identical to today.
+- **Do not remove or regress working features.** `events.cover` must keep working (it drives `event-card.tsx`); events with no uploads must look identical to today.
 - **No opportunistic refactoring.** Touch only what the task requires.
 - **There is no unit-test framework in this project** (no jest/vitest). Tests are executable `scripts/prove-*.mjs` node scripts asserted against the real hosted database, registered in `package.json`. Follow that convention exactly. Do NOT add a test framework.
 - **Guard first.** Every mutating server action calls its guard (`requirePYH` / `requireClusterAccess` from `src/lib/supabase/admin-auth.ts`) as its **first statement**, before Zod parsing or any DB access. Server actions are publicly callable POST endpoints regardless of which page renders them.
@@ -704,10 +704,21 @@ Note exactly how it currently renders `cover`, and reuse the surrounding framer-
 
 - [ ] **Step 2: Build the carousel**
 
-`"use client"`. Props: `{ images: EventImage[]; fallback: string; name: string }`.
+`"use client"`. Props: `{ images: EventImage[]; name: string }`.
+
+> **Plan correction (found during Task 8).** This plan and its spec both assumed
+> `event-modal.tsx` renders `event.cover` and that the carousel should fall back
+> to it. **It does not.** Verified against the file and its full git history: the
+> modal has never rendered any image. `cover` is rendered by `event-card.tsx:30`
+> — the card, not the modal. So a `fallback` prop is wrong twice over: it is dead
+> code, and honoring it would ADD an image to the modal that was never there,
+> visibly changing every existing event (all of which have a cover and no
+> uploads). The correct zero-images behavior is to render **nothing**.
 
 Requirements — all are constraints, not suggestions:
-- If `images.length === 0`, render exactly what the modal renders today from `fallback`. **An event with no uploads must be pixel-identical to today.**
+- If `images.length === 0`, render **nothing** (`return null`). The modal shows no
+  image today, so contributing zero DOM nodes is what "identical to today" means
+  here. Do not accept a `fallback` prop; do not invent a placeholder.
 - If `images.length === 1`, render the single image with no controls.
 - Prev/next buttons with `aria-label`, plus ArrowLeft/ArrowRight key handling when focused.
 - `alt` from the DB (fall back to `name`).
@@ -716,7 +727,7 @@ Requirements — all are constraints, not suggestions:
 
 - [ ] **Step 3: Render it in the modal**
 
-Replace the modal's current cover `<Image>` with `<EventCarousel images={event.images ?? []} fallback={event.cover} name={event.name} />`.
+Render `<EventCarousel images={event.images ?? []} name={event.name} />` where the images belong. NOTE: the modal renders no cover image today (see the Plan correction above) — you are ADDING the carousel, not replacing anything.
 
 - [ ] **Step 4: Verify**
 

@@ -99,9 +99,10 @@ own; deactivated/soft-deleted admins may write nothing. Public/anon gets `SELECT
 only. The policies must be expressed against the parent event's ownership via a
 subquery, so ownership cannot drift between an event and its images.
 
-**`events.cover` is retained**, not dropped. It stays the single-image fallback so
-nothing regresses. Read precedence: first `event_images` row by `sort_order`, else
-`cover`, else the existing placeholder behavior.
+**`events.cover` is retained**, not dropped, and is left entirely untouched — it
+keeps driving `event-card.tsx` exactly as it does today, so nothing regresses.
+The carousel is purely additive and does not consult `cover` at all (see the
+Correction under "Public carousel" below).
 
 ### 3. Upload path
 
@@ -144,8 +145,18 @@ Existing `cover` URL field stays, so current events keep working untouched.
 ### 5. Public carousel
 
 A new `src/components/shared/event-carousel.tsx`, used inside the existing
-`event-modal.tsx`. It renders `event_images` when present and falls back to the
-single `cover` otherwise — so events with no uploads look exactly as they do today.
+`event-modal.tsx`. It renders `event_images` when present and renders **nothing**
+otherwise — so events with no uploads look exactly as they do today.
+
+> **Correction (found during implementation).** This spec originally said the
+> carousel would "fall back to the single `cover`". That was based on a false
+> premise: `event-modal.tsx` does **not** render `event.cover` and never has
+> (verified against the file's full git history). `cover` is rendered by
+> `event-card.tsx` — the card, not the modal. Falling back to it would have
+> *added* an image to the modal for every existing event (all of which have a
+> cover and no uploads), visibly changing the live site — precisely what the
+> no-redesign constraint forbids. Zero images therefore renders nothing.
+> `events.cover` is still retained and untouched; it keeps driving the card.
 
 Requirements: keyboard-navigable (arrow keys, visible focus ring), `alt` text from
 the DB, respects `prefers-reduced-motion`, and does not autoplay. It must reuse the
@@ -214,14 +225,15 @@ Following the project's established "prove it against the real DB" convention
    row plus a retrievable object; deleting removes both row and object (no orphan).
 3. **Manual verification**: create an event with 3 images, confirm the carousel
    renders and is keyboard-navigable on `/events`, confirm the homepage reflects it,
-   confirm an event with no uploads still renders its `cover` exactly as before.
+   confirm an event with no uploads renders exactly as before — its card still
+   shows `cover`, and its modal shows no image (the carousel renders nothing).
 
 ## Success criteria
 
 - A PYH or owning cluster head can upload multiple images to an event, preview,
   reorder, and delete them.
 - Those images render in a keyboard-accessible carousel on the public site.
-- An event with no uploaded images renders identically to today.
+- An event with no uploaded images renders identically to today (card shows `cover`; modal shows no image).
 - A cluster head cannot touch another cluster's event images (proven, not asserted).
 - Forged/oversized files are rejected (proven).
 - The homepage no longer serves stale or mock events.
