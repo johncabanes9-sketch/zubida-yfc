@@ -3,13 +3,14 @@ import type { AdminContext } from "@/lib/rbac";
 import { signOut } from "../login/actions";
 import { Button } from "@/components/ui/button";
 
-type Tab = "registrations" | "events" | "users" | "logs";
+type Tab = "registrations" | "events" | "users" | "logs" | "settings";
 
 const baseTabs: { key: Tab; href: string; label: string; pyhOnly?: boolean }[] = [
   { key: "registrations", href: "/admin", label: "Registrations" },
   { key: "events", href: "/admin/events", label: "Events" },
   { key: "users", href: "/admin/users", label: "Users", pyhOnly: true },
   { key: "logs", href: "/admin/logs", label: "Logs", pyhOnly: true },
+  { key: "settings", href: "/admin/settings", label: "Settings", pyhOnly: true },
 ];
 
 export function AdminShell({
