@@ -1,14 +1,14 @@
-import { requireAdmin, createServerSupabase } from "@/lib/supabase/admin-auth";
+import { loadAdminContext, createServerSupabase } from "@/lib/supabase/admin-auth";
+import { AdminShell } from "./_components/admin-shell";
 import { RegistrationsTable, type Row } from "@/components/admin/registrations-table";
-import { signOut } from "./login/actions";
-import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Admin Dashboard", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  await requireAdmin();
+  const ctx = await loadAdminContext();
   const supabase = await createServerSupabase();
+  // RLS already scopes rows to the viewer's cluster; no extra filter needed.
   const { data } = await supabase
     .from("event_registrations")
     .select("registration_id, full_name, email, chapter, status, created_at")
@@ -22,29 +22,16 @@ export default async function AdminDashboard() {
   const approved = rows.filter((r) => r.status === "approved").length;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gold-600 dark:text-gold-400">
-            Admin
-          </p>
-          <h1 className="font-display text-3xl font-semibold">Registrations</h1>
-        </div>
-        <form action={signOut}>
-          <Button variant="ghost" size="sm" type="submit">Sign out</Button>
-        </form>
-      </div>
-
-      <div className="mt-8 grid grid-cols-3 gap-4">
+    <AdminShell ctx={ctx} active="registrations" title="Registrations">
+      <div className="grid grid-cols-3 gap-4">
         <Stat label="Total" value={total} />
         <Stat label="Pending" value={pending} />
         <Stat label="Approved" value={approved} />
       </div>
-
       <div className="mt-10">
         <RegistrationsTable initial={rows} />
       </div>
-    </section>
+    </AdminShell>
   );
 }
 
