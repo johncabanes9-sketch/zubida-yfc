@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabase, loadAdminContext, requireClusterAccess } from "@/lib/supabase/admin-auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import { eventSchema } from "@/lib/validation/event";
 import type { EventRow } from "@/lib/supabase/database.types";
 
@@ -13,8 +14,11 @@ function parse(formData: FormData) {
 }
 
 async function audit(userId: string, action: string, id: string) {
-  const supabase = await createServerSupabase();
-  await supabase.from("audit_log").insert({ actor_user_id: userId, action, entity: "events", entity_id: id });
+  try {
+    await createServiceClient().from("audit_log").insert({ actor_user_id: userId, action, entity: "events", entity_id: id });
+  } catch {
+    // audit is best-effort; never block the mutation on logging failure
+  }
 }
 
 export async function createEvent(formData: FormData) {

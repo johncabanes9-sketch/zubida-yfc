@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useTransition } from "react";
 import { setEventStatus, deleteEvent } from "../actions";
-import { Button } from "@/components/ui/button";
 
 export type EventListRow = {
   id: string;
