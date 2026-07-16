@@ -17,16 +17,19 @@ export function sniffImageType(b: Uint8Array): "image/jpeg" | "image/png" | "ima
   return null;
 }
 
+/**
+ * The sniffed type is the SINGLE SOURCE OF TRUTH. The client's declared MIME is
+ * deliberately not consulted: it adds no safety (the sniff already proves the
+ * bytes are jpeg/png/webp) and cross-checking it only rejects legitimate files —
+ * e.g. a real PNG renamed to .jpg, which browsers label image/jpeg. Callers must
+ * store the returned `mime`, never the client's.
+ */
 export function validateImage(
-  bytes: Uint8Array, declaredMime: string, size: number,
+  bytes: Uint8Array, size: number,
 ): { ok: true; mime: string } | { ok: false; reason: string } {
   if (size > MAX_BYTES) return { ok: false, reason: `File exceeds the ${MAX_BYTES / 1024 / 1024}MB limit.` };
   if (size === 0) return { ok: false, reason: "File is empty." };
   const sniffed = sniffImageType(bytes);
   if (!sniffed) return { ok: false, reason: "Not a JPEG, PNG, or WebP image." };
-  if (!ALLOWED_MIME.includes(declaredMime as (typeof ALLOWED_MIME)[number])) {
-    return { ok: false, reason: `Unsupported type ${declaredMime}.` };
-  }
-  if (sniffed !== declaredMime) return { ok: false, reason: "File contents do not match its declared type." };
   return { ok: true, mime: sniffed };
 }

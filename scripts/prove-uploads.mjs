@@ -19,12 +19,18 @@ check("sniffs jpeg", sniffImageType(JPEG) === "image/jpeg", sniffImageType(JPEG)
 check("sniffs png",  sniffImageType(PNG)  === "image/png",  sniffImageType(PNG));
 check("sniffs webp", sniffImageType(WEBP) === "image/webp", sniffImageType(WEBP));
 
-// The core security assertion: a forged MIME must not survive the sniff.
-check("REJECTS exe forged as image/jpeg", validateImage(EXE, "image/jpeg", EXE.length).ok === false, validateImage(EXE, "image/jpeg", EXE.length));
-check("REJECTS svg (script vector)",      validateImage(SVG, "image/svg+xml", SVG.length).ok === false, validateImage(SVG, "image/svg+xml", SVG.length));
-check("REJECTS oversized file",           validateImage(JPEG, "image/jpeg", MAX_BYTES + 1).ok === false, validateImage(JPEG, "image/jpeg", MAX_BYTES + 1));
+// The core security assertion: the bytes decide, so a forged declaration is irrelevant.
+check("REJECTS exe (MZ) even if the client calls it a jpeg", validateImage(EXE, EXE.length).ok === false, validateImage(EXE, EXE.length));
+check("REJECTS svg (script vector)",      validateImage(SVG, SVG.length).ok === false, validateImage(SVG, SVG.length));
+check("REJECTS oversized file",           validateImage(JPEG, MAX_BYTES + 1).ok === false, validateImage(JPEG, MAX_BYTES + 1));
 // Positive control — without this an always-reject bug would pass everything above.
-check("ACCEPTS a real jpeg",              validateImage(JPEG, "image/jpeg", JPEG.length).ok === true, validateImage(JPEG, "image/jpeg", JPEG.length));
+check("ACCEPTS a real jpeg",              validateImage(JPEG, JPEG.length).ok === true, validateImage(JPEG, JPEG.length));
+// The renamed-file case: a real PNG that a browser labels image/jpeg (because the
+// user renamed it .jpg) must be ACCEPTED and reported as png, so the caller stores
+// the correct contentType. Guards against reintroducing a declared-vs-actual check.
+const pngResult = validateImage(PNG, PNG.length);
+check("ACCEPTS a real png regardless of what the client called it",
+      pngResult.ok === true && pngResult.mime === "image/png", pngResult);
 
 console.log("─".repeat(48));
 console.log(`${pass} passed, ${fail} failed`);
