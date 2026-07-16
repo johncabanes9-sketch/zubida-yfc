@@ -113,3 +113,29 @@ export interface CheckResult {
   event_date?: string;
   qr_token?: string;
 }
+
+export interface SiteSettingsRow {
+  id: number;
+  name: string;
+  full_name: string;
+  tagline: string;
+  description: string;
+  province: string;
+  email: string;
+  phone: string;
+  office: string;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  footer_explore_heading: string;
+  footer_reach_heading: string;
+  footer_closing_line: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface NavItemRow {
+  href: string;
+  label: string;
+  sort_order: number;
+  visible: boolean;
+}
