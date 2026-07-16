@@ -32,6 +32,89 @@ const pngResult = validateImage(PNG, PNG.length);
 check("ACCEPTS a real png regardless of what the client called it",
       pngResult.ok === true && pngResult.mime === "image/png", pngResult);
 
-console.log("─".repeat(48));
-console.log(`${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+// ── Reap-on-delete: event_images + storage object must not outlive the event ──
+// deleteEvent is a server action (auth context + Next.js request scope), so it
+// can't be invoked from a plain node script. Instead we replicate the exact
+// reap sequence from src/app/admin/events/actions.ts against the real hosted
+// DB and bucket, and assert on the outcome. This proves the SEQUENCE is
+// correct; it does NOT exercise deleteEvent itself (its auth guards, its
+// soft-delete write) — that end-to-end path is covered by Task 10's manual
+// verification.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !service) {
+  console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in .env.local");
+  process.exit(1);
+}
+const admin = createClient(url, service, { auth: { persistSession: false } });
+
+(async () => {
+  const stamp = Date.now();
+  let eventId;
+  let key;
+  try {
+    // Fixture event. cluster_id/created_by are nullable and irrelevant here —
+    // event_images just needs a real events.id to satisfy its FK.
+    const deadline = new Date(Date.now() + 7 * 864e5).toISOString();
+    const { data: ev, error: evErr } = await admin
+      .from("events")
+      .insert({ name: `prove-uploads reap ${stamp}`, date: "2026-12-01", registration_deadline: deadline, slots_total: 1 })
+      .select("id").single();
+    if (evErr) throw new Error(`fixture event insert failed: ${evErr.message}`);
+    eventId = ev.id;
+
+    // Real JPEG bytes + matching contentType, so the bucket's allowed_mime_types
+    // check doesn't reject the fixture upload for an unrelated reason.
+    const uuid = crypto.randomUUID();
+    const filename = `${uuid}.jpg`;
+    key = `events/${eventId}/${filename}`;
+    const folder = `events/${eventId}`;
+
+    const up = await admin.storage.from("media").upload(key, JPEG, { contentType: "image/jpeg", upsert: false });
+    check("fixture upload to storage succeeds", !up.error, up.error?.message);
+
+    const { data: imgRow, error: imgErr } = await admin
+      .from("event_images")
+      .insert({ event_id: eventId, path: key, sort_order: 0 })
+      .select("id").single();
+    check("fixture event_images row inserted", !imgErr, imgErr?.message);
+
+    // POSITIVE CONTROL: prove the object actually exists BEFORE the reap. Using
+    // list() on the parent folder (not download/signedUrl) because it's the
+    // same call the reap-verification below reuses to prove absence — one
+    // existence-check method, used symmetrically before and after.
+    const before = await admin.storage.from("media").list(folder);
+    const existedBefore = !before.error && before.data?.some((f) => f.name === filename);
+    check("POSITIVE CONTROL: object exists in bucket before reap", existedBefore, before.error?.message ?? before.data);
+
+    // Replicate deleteEvent's reap sequence verbatim (src/app/admin/events/actions.ts).
+    const { data: imgs } = await admin.from("event_images").select("id, path").eq("event_id", eventId);
+    if (imgs && imgs.length > 0) {
+      await admin.storage.from("media").remove(imgs.map((i) => i.path));
+      await admin.from("event_images").delete().eq("event_id", eventId);
+    }
+
+    const rowsAfter = await admin.from("event_images").select("id").eq("event_id", eventId);
+    check("event_images rows gone after reap", (rowsAfter.data?.length ?? -1) === 0, rowsAfter.data);
+
+    const after = await admin.storage.from("media").list(folder);
+    const goneAfter = !after.error && !after.data?.some((f) => f.name === filename);
+    check("storage object gone after reap", goneAfter, after.error?.message ?? after.data);
+  } catch (e) {
+    fail++;
+    console.log(`  FAIL  reap-on-delete setup/assertion threw  got=${e.message}`);
+  } finally {
+    // Cleanup, best-effort, even on a failure path above. Storage remove() is
+    // idempotent (no error on an already-missing object), so calling it even
+    // when the reap already succeeded is safe.
+    if (key) await admin.storage.from("media").remove([key]);
+    if (eventId) {
+      await admin.from("event_images").delete().eq("event_id", eventId);
+      await admin.from("events").delete().eq("id", eventId);
+    }
+  }
+
+  console.log("─".repeat(48));
+  console.log(`${pass} passed, ${fail} failed`);
+  process.exit(fail === 0 ? 0 : 1);
+})();

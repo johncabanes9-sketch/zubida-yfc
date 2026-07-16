@@ -105,6 +105,18 @@ export async function deleteEvent(id: string) {
   const supabase = await createServerSupabase();
   const { data: existing } = await supabase.from("events").select("cluster_id").eq("id", id).single();
   const ctx = await requireClusterAccess((existing as Pick<EventRow, "cluster_id"> | null)?.cluster_id ?? null);
+
+  // Soft-deleting the event hides it, but event_images' ON DELETE CASCADE never
+  // fires (we never hard-delete), and media_public_read serves any object in the
+  // bucket regardless of its event's state. So reap explicitly: without this the
+  // bytes stay live at their direct URL forever after the event is gone.
+  const svc = createServiceClient();
+  const { data: imgs } = await svc.from("event_images").select("id, path").eq("event_id", id);
+  if (imgs && imgs.length > 0) {
+    await svc.storage.from("media").remove(imgs.map((i) => i.path));
+    await svc.from("event_images").delete().eq("event_id", id);
+  }
+
   // Soft delete. RLS delete policy also enforces created_by for cluster heads on hard delete;
   // here we UPDATE deleted_at (an update), so ownership is enforced by the update policy + this guard.
   const { data, error } = await supabase.from("events").update({ deleted_at: new Date().toISOString() }).eq("id", id).select("id");
