@@ -171,7 +171,13 @@ export async function deleteEventImage(imageId: string): Promise<{ error?: strin
   const ev = await eventClusterOrThrow(img.event_id);
   const ctx = await requireClusterAccess(ev.cluster_id); // guard before deleting
 
-  await svc.storage.from("media").remove([img.path]); // object first, then row
+  // Remove the object BEFORE the row, and only drop the row if removal actually
+  // succeeded. If we deleted the row first (or ignored this error), a failed
+  // removal would leave a file nothing references — an untraceable orphan.
+  // Keeping the row on failure is self-healing: the delete can simply be retried.
+  const rm = await svc.storage.from("media").remove([img.path]);
+  if (rm.error) return { error: "Could not delete the image file. Please try again." };
+
   const del = await svc.from("event_images").delete().eq("id", imageId);
   if (del.error) return { error: "Could not delete image." };
 
