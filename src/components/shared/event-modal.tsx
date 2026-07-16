@@ -101,7 +101,6 @@ export function EventModal({
               <div className="p-6">
                 <EventCarousel
                   images={event.images ?? []}
-                  fallback={event.cover}
                   name={event.name}
                 />
                 <h2 className="font-display text-2xl font-semibold">{event.name}</h2>

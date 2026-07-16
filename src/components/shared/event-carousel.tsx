@@ -7,22 +7,15 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { EventImage } from "@/data/types";
 
 /**
- * Renders an event's uploaded photos in place of the (currently nonexistent)
- * cover image inside `EventModal`. `event-modal.tsx` has never rendered
- * `event.cover` — every event in production today has zero uploaded images,
- * so when `images` is empty this component renders nothing, exactly
- * preserving that status quo. `fallback` is accepted to match the call site
- * contract but is intentionally unused for rendering: showing the cover here
- * would be new UI for every event currently live, which is the regression
- * this task must avoid.
+ * Renders an event's uploaded photos inside `EventModal`. `event-modal.tsx`
+ * renders no image today, so when `images` is empty this component returns
+ * `null`, contributing zero DOM nodes and exactly preserving that status quo.
  */
 export function EventCarousel({
   images,
-  fallback: _fallback,
   name,
 }: {
   images: EventImage[];
-  fallback: string;
   name: string;
 }) {
   const [index, setIndex] = useState(0);
