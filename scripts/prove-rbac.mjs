@@ -89,6 +89,30 @@ async function authedClient(email) {
   const auditRead = await ch.from("audit_log").select("id").limit(5);
   check("CH CANNOT read audit_log (row exists but hidden)", (auditRead.data?.length ?? 0) === 0, auditRead.data);
 
+  // 9. CH CANNOT write site_settings (PYH-only global content). The row exists
+  // (seeded by migration 0013), so only RLS can make this update affect 0 rows.
+  const updSettings = await ch.from("site_settings").update({ tagline: "hacked by CH" }).eq("id", 1).select("id");
+  check("CH CANNOT write site_settings", (updSettings.data?.length ?? 0) === 0, updSettings.error?.message ?? updSettings.data);
+
+  // 10. CH CANNOT write nav_items.
+  const updNav = await ch.from("nav_items").update({ label: "hacked" }).eq("href", "/about").select("href");
+  check("CH CANNOT write nav_items", (updNav.data?.length ?? 0) === 0, updNav.error?.message ?? updNav.data);
+
+  // 11-12. Read back with service-role: a policy that silently allowed the write
+  // but returned no rows would pass 9-10 while the site was actually defaced.
+  const { data: settingsAfter } = await admin.from("site_settings").select("tagline").eq("id", 1).single();
+  check("site_settings tagline unchanged after CH attempt", settingsAfter.tagline !== "hacked by CH", settingsAfter.tagline);
+  const { data: navAfter } = await admin.from("nav_items").select("label").eq("href", "/about").single();
+  check("nav_items label unchanged after CH attempt", navAfter.label !== "hacked", navAfter.label);
+
+  // 13. PYH CAN write site_settings. Without this, an over-strict policy would
+  // break the admin screen and every denial assertion would still pass.
+  const pyh = await authedClient(pyhEmail);
+  const originalTagline = settingsAfter.tagline;
+  const pyhWrite = await pyh.from("site_settings").update({ tagline: "PYH proof write" }).eq("id", 1).select("tagline");
+  check("PYH CAN write site_settings", pyhWrite.data?.[0]?.tagline === "PYH proof write", pyhWrite.error?.message ?? pyhWrite.data);
+  await admin.from("site_settings").update({ tagline: originalTagline }).eq("id", 1);
+
   // cleanup
   await admin.from("events").delete().in("cluster_id", [clusterA, clusterB]).like("name", "RBAC %");
   await admin.from("events").delete().eq("name", "CH new");
