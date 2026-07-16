@@ -11,7 +11,13 @@ import { ThemeToggle } from "./theme-toggle";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function Navbar() {
+export function Navbar({
+  site = SITE,
+  navLinks = NAV_LINKS,
+}: {
+  site?: { name: string };
+  navLinks?: { href: string; label: string }[];
+} = {}) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -43,7 +49,7 @@ export function Navbar() {
           </span>
           <span className="flex flex-col leading-none">
             <span className="font-display text-lg font-semibold tracking-tight">
-              {SITE.name}
+              {site.name}
             </span>
             <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted">
               Zamboanga del Sur
@@ -52,7 +58,7 @@ export function Navbar() {
         </Link>
 
         <ul className="hidden items-center gap-1 lg:flex">
-          {NAV_LINKS.map((link) => {
+          {navLinks.map((link) => {
             const active =
               link.href === "/"
                 ? pathname === "/"
@@ -108,7 +114,7 @@ export function Navbar() {
             className="overflow-hidden lg:hidden"
           >
             <ul className="glass mx-4 mt-3 flex flex-col gap-1 rounded-2xl p-3">
-              {NAV_LINKS.map((link) => {
+              {navLinks.map((link) => {
                 const active =
                   link.href === "/"
                     ? pathname === "/"

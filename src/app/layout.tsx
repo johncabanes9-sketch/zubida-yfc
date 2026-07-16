@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { LoadingScreen } from "@/components/layout/loading-screen";
 import { FloatingVerse } from "@/components/shared/floating-verse";
-import { SITE } from "@/lib/constants";
+import { getSiteSettings } from "@/lib/data/site";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -21,28 +21,31 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://zubidayfc.org"),
-  title: {
-    default: `${SITE.name} — ${SITE.tagline}`,
-    template: `%s — ${SITE.name}`,
-  },
-  description: SITE.description,
-  keywords: [
-    "Youth for Christ",
-    "YFC",
-    "Zamboanga del Sur",
-    "Zubida",
-    "Catholic youth",
-    "Philippines",
-  ],
-  openGraph: {
-    title: `${SITE.name} — ${SITE.tagline}`,
-    description: SITE.description,
-    type: "website",
-    locale: "en_PH",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { site } = await getSiteSettings();
+  return {
+    metadataBase: new URL("https://zubidayfc.org"),
+    title: {
+      default: `${site.name} — ${site.tagline}`,
+      template: `%s — ${site.name}`,
+    },
+    description: site.description,
+    keywords: [
+      "Youth for Christ",
+      "YFC",
+      "Zamboanga del Sur",
+      "Zubida",
+      "Catholic youth",
+      "Philippines",
+    ],
+    openGraph: {
+      title: `${site.name} — ${site.tagline}`,
+      description: site.description,
+      type: "website",
+      locale: "en_PH",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#12224E",
@@ -53,11 +56,12 @@ const themeScript = `
 (function(){try{var t=localStorage.getItem('zubida-theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { site, navLinks } = await getSiteSettings();
   return (
     <html lang="en" className={`${fraunces.variable} ${jakarta.variable}`}>
       <head>
@@ -66,9 +70,9 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider>
           <LoadingScreen />
-          <Navbar />
+          <Navbar site={site} navLinks={navLinks} />
           <main>{children}</main>
-          <Footer />
+          <Footer site={site} navLinks={navLinks} />
           <FloatingVerse />
         </ThemeProvider>
       </body>

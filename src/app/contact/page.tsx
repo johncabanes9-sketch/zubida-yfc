@@ -5,7 +5,7 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { ContactForm } from "@/components/contact/contact-form";
 import { Faq } from "@/components/contact/faq";
 import { Reveal } from "@/components/shared/reveal";
-import { SITE } from "@/lib/constants";
+import { getSiteSettings } from "@/lib/data/site";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -13,13 +13,13 @@ export const metadata: Metadata = {
     "Get in touch with the Zubida YFC provincial office in Zamboanga del Sur.",
 };
 
-const contactItems = [
-  { icon: MapPin, label: "Province Office", value: SITE.office },
-  { icon: Mail, label: "Email", value: SITE.email, href: `mailto:${SITE.email}` },
-  { icon: Phone, label: "Phone", value: SITE.phone, href: `tel:${SITE.phone}` },
-];
-
-export default function ContactPage() {
+export default async function ContactPage() {
+  const { site } = await getSiteSettings();
+  const contactItems = [
+    { icon: MapPin, label: "Province Office", value: site.office },
+    { icon: Mail, label: "Email", value: site.email, href: `mailto:${site.email}` },
+    { icon: Phone, label: "Phone", value: site.phone, href: `tel:${site.phone}` },
+  ];
   return (
     <>
       <PageHeader
@@ -59,14 +59,14 @@ export default function ContactPage() {
               <Reveal delay={0.3}>
                 <div className="flex gap-3">
                   <a
-                    href={SITE.socials.facebook}
+                    href={site.socials.facebook}
                     aria-label="Facebook"
                     className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
                   >
                     <Facebook className="h-5 w-5" />
                   </a>
                   <a
-                    href={SITE.socials.instagram}
+                    href={site.socials.instagram}
                     aria-label="Instagram"
                     className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
                   >

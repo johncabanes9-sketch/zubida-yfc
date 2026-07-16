@@ -14,7 +14,7 @@ const slides = [
   "https://picsum.photos/seed/hero-mission/1600/1000",
 ];
 
-export function Hero() {
+export function Hero({ province = SITE.province }: { province?: string } = {}) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function Hero() {
             className="glass mb-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-gold-300"
           >
             <Sparkles className="h-4 w-4" />
-            {SITE.province} · Youth for Christ
+            {province} · Youth for Christ
           </motion.div>
 
           <motion.h1
