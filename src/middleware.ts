@@ -21,13 +21,25 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const redirectTo = (path: string) => {
+    const r = NextResponse.redirect(new URL(path, request.url));
+    // carry over any cookies Supabase set on `response` during getUser()/signOut()
+    response.cookies.getAll().forEach((c) => r.cookies.set(c));
+    return r;
+  };
+
+  let user = null;
+  try {
+    ({
+      data: { user },
+    } = await supabase.auth.getUser());
+  } catch {
+    return redirectTo("/admin/login");
+  }
 
   if (!user) {
     if (isLogin) return response;
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+    return redirectTo("/admin/login");
   }
 
   // Idle timeout
@@ -35,9 +47,9 @@ export async function middleware(request: NextRequest) {
   const now = Date.now();
   if (last && now - Number(last) > IDLE_TIMEOUT_MS) {
     await supabase.auth.signOut();
-    const res = NextResponse.redirect(new URL("/admin/login?error=timeout", request.url));
-    res.cookies.set("last_activity", "", { maxAge: 0, path: "/" });
-    return res;
+    const r = redirectTo("/admin/login?error=timeout");
+    r.cookies.set("last_activity", "", { maxAge: 0, path: "/" });
+    return r;
   }
   response.cookies.set("last_activity", String(now), {
     httpOnly: true,
@@ -47,7 +59,7 @@ export async function middleware(request: NextRequest) {
   });
 
   if (isLogin) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    return redirectTo("/admin");
   }
   return response;
 }
