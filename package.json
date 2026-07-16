@@ -11,7 +11,8 @@
     "db:seed": "node scripts/db-migrate.mjs --seed",
     "prove:concurrency": "node scripts/prove-concurrency.mjs",
     "prove:behaviors": "node scripts/prove-behaviors.mjs",
-    "prove:rbac": "node scripts/prove-rbac.mjs"
+    "prove:rbac": "node scripts/prove-rbac.mjs",
+    "prove:uploads": "node --experimental-strip-types scripts/prove-uploads.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
