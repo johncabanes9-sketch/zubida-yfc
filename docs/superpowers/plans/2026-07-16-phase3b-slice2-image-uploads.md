@@ -256,9 +256,9 @@ Insert immediately **before** the `// cleanup` comment near the end of `scripts/
     .select("id").single();
 
   // 14. CH CANNOT insert an image on cluster-B's event.
-  const insB = await ch.from("event_images")
+  const insBImg = await ch.from("event_images")
     .insert({ event_id: evB.id, path: "events/hack.jpg", sort_order: 0 }).select("id");
-  check("CH CANNOT insert image on cluster-B event", insB.error !== null || (insB.data?.length ?? 0) === 0, insB.error?.message ?? insB.data);
+  check("CH CANNOT insert image on cluster-B event", insBImg.error !== null || (insBImg.data?.length ?? 0) === 0, insBImg.error?.message ?? insBImg.data);
 
   // 15. CH CANNOT delete cluster-B's image. A blocked delete is not an error —
   // RLS filters the row out — so assert the row SURVIVES rather than trusting the response.
@@ -275,9 +275,9 @@ Insert immediately **before** the `// cleanup` comment near the end of `scripts/
   check("anon CANNOT insert event_images", anonWrite.error !== null || (anonWrite.data?.length ?? 0) === 0, anonWrite.error?.message ?? anonWrite.data);
 
   // 17. POSITIVE CONTROL: CH CAN insert an image on its OWN cluster's event.
-  const insA = await ch.from("event_images")
+  const insAImg = await ch.from("event_images")
     .insert({ event_id: evA.id, path: `events/${evA.id}/ch-own.jpg`, sort_order: 1 }).select("id");
-  check("CH CAN insert image on own cluster-A event", !insA.error && insA.data?.length === 1, insA.error?.message ?? insA.data);
+  check("CH CAN insert image on own cluster-A event", !insAImg.error && insAImg.data?.length === 1, insAImg.error?.message ?? insAImg.data);
 
   // 18. DELIBERATE DESIGN, PROVEN: a same-cluster admin who did NOT create the
   // event CAN still delete its images, even though events_delete (0011) would
@@ -303,9 +303,9 @@ Under the existing `// cleanup` comment, add this **above** the existing `events
 - [ ] **Step 3: Run the proof**
 
 Run: `npm run prove:rbac`
-Expected: **18 passed, 0 failed**. (It was 13 before this task.)
+Expected: **19 passed, 0 failed**. (It was 13 before this task; the 6 new checks are numbered 14-18 in prose, but "16" covers two check() calls — anon read AND anon write — so the tally is 19, not 18.)
 
-If assertion 17 fails, the write policy is too strict — fix `0015_event_images.sql`, re-run `npm run db:migrate`, re-run. If 14/15/16 fail, the policy is too loose. If 18 fails, the policy became stricter than the accepted design — do not "fix" it by loosening 14/15; escalate. Do not proceed until this is 18/18.
+If assertion 17 fails, the write policy is too strict — fix `0015_event_images.sql`, re-run `npm run db:migrate`, re-run. If 14/15/16 fail, the policy is too loose. If 18 fails, the policy became stricter than the accepted design — do not "fix" it by loosening 14/15; escalate. Do not proceed until this is 19/19.
 
 - [ ] **Step 4: Commit**
 
@@ -807,7 +807,7 @@ Task 1).
 npx tsc --noEmit
 npm run lint
 npm run build
-npm run prove:rbac      # expect 18 passed, 0 failed
+npm run prove:rbac      # expect 19 passed, 0 failed
 npm run prove:uploads   # expect 7 base assertions + Task 9's reap assertions
 npm run prove:behaviors
 npm run prove:concurrency
