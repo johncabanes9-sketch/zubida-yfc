@@ -55,6 +55,9 @@ export async function createEvent(formData: FormData) {
 }
 
 export async function updateEvent(id: string, formData: FormData) {
+  // Authenticate before any read: this is a public POST endpoint, and looking up
+  // the event first would tell an anonymous caller whether `id` exists at all.
+  await loadAdminContext();
   const supabase = await createServerSupabase();
   const { data: existing } = await supabase.from("events").select("cluster_id").eq("id", id).single();
   const ctx = await requireClusterAccess((existing as Pick<EventRow, "cluster_id"> | null)?.cluster_id ?? null);
@@ -82,6 +85,9 @@ export async function updateEvent(id: string, formData: FormData) {
 }
 
 export async function setEventStatus(id: string, status: "Open" | "Closed" | "Finished") {
+  // Authenticate before any read (see updateEvent): avoids leaking event existence
+  // to unauthenticated callers via the guard-vs-error response difference.
+  await loadAdminContext();
   const supabase = await createServerSupabase();
   const { data: existing } = await supabase.from("events").select("cluster_id").eq("id", id).single();
   const ctx = await requireClusterAccess((existing as Pick<EventRow, "cluster_id"> | null)?.cluster_id ?? null);
@@ -93,6 +99,9 @@ export async function setEventStatus(id: string, status: "Open" | "Closed" | "Fi
 }
 
 export async function deleteEvent(id: string) {
+  // Authenticate before any read (see updateEvent): avoids leaking event existence
+  // to unauthenticated callers via the guard-vs-error response difference.
+  await loadAdminContext();
   const supabase = await createServerSupabase();
   const { data: existing } = await supabase.from("events").select("cluster_id").eq("id", id).single();
   const ctx = await requireClusterAccess((existing as Pick<EventRow, "cluster_id"> | null)?.cluster_id ?? null);
@@ -118,6 +127,9 @@ async function eventClusterOrThrow(eventId: string) {
 }
 
 export async function uploadEventImages(eventId: string, form: FormData): Promise<{ error?: string }> {
+  // Authenticate before any service-role read: this action is a public POST endpoint,
+  // and reading first would leak whether an event id exists to anonymous callers.
+  await loadAdminContext();
   const ev = await eventClusterOrThrow(eventId);
   const ctx = await requireClusterAccess(ev.cluster_id); // guard before any I/O
 
@@ -161,6 +173,9 @@ export async function uploadEventImages(eventId: string, form: FormData): Promis
 }
 
 export async function deleteEventImage(imageId: string): Promise<{ error?: string }> {
+  // Authenticate before any service-role read (see uploadEventImages): otherwise an
+  // anonymous caller could tell an existing image id from a bogus one by the response.
+  await loadAdminContext();
   const svc = createServiceClient();
   const { data: img } = await svc
     .from("event_images")
@@ -189,6 +204,9 @@ export async function deleteEventImage(imageId: string): Promise<{ error?: strin
 }
 
 export async function reorderEventImage(imageId: string, direction: "up" | "down"): Promise<{ error?: string }> {
+  // Authenticate before any service-role read (see uploadEventImages): otherwise an
+  // anonymous caller could tell an existing image id from a bogus one by the response.
+  await loadAdminContext();
   const svc = createServiceClient();
   const { data: img } = await svc
     .from("event_images")
