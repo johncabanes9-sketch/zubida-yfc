@@ -16,6 +16,7 @@ import type { EventItem } from "@/data/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RegistrationForm } from "./registration-form";
+import { EventCarousel } from "./event-carousel";
 
 export function EventModal({
   event,
@@ -98,6 +99,11 @@ export function EventModal({
 
             {tab === "details" ? (
               <div className="p-6">
+                <EventCarousel
+                  images={event.images ?? []}
+                  fallback={event.cover}
+                  name={event.name}
+                />
                 <h2 className="font-display text-2xl font-semibold">{event.name}</h2>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <Info icon={<CalendarDays className="h-4 w-4" />} label="Date" value={formatDate(event.date)} />
