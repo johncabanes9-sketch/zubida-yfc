@@ -278,6 +278,18 @@ Insert immediately **before** the `// cleanup` comment near the end of `scripts/
   const insA = await ch.from("event_images")
     .insert({ event_id: evA.id, path: `events/${evA.id}/ch-own.jpg`, sort_order: 1 }).select("id");
   check("CH CAN insert image on own cluster-A event", !insA.error && insA.data?.length === 1, insA.error?.message ?? insA.data);
+
+  // 18. DELIBERATE DESIGN, PROVEN: a same-cluster admin who did NOT create the
+  // event CAN still delete its images, even though events_delete (0011) would
+  // forbid deleting the event itself (it requires created_by = auth.uid()).
+  // Managing photos is treated as an EDIT to the event — which events_update
+  // already allows any same-cluster admin to do — not as deleting the event.
+  // This asymmetry is intentional and accepted; it is asserted here so that it
+  // is a proven decision rather than an accident of `for all` policy semantics.
+  // evA was created by pyhId, NOT by the cluster head, so this is exactly the case.
+  await ch.from("event_images").delete().eq("id", imgA.id);
+  const goneA = await admin.from("event_images").select("id").eq("id", imgA.id);
+  check("CH CAN delete image on a same-cluster event it did NOT create (intentional)", goneA.data?.length === 0, goneA.data);
 ```
 
 - [ ] **Step 2: Add cleanup**
@@ -291,9 +303,9 @@ Under the existing `// cleanup` comment, add this **above** the existing `events
 - [ ] **Step 3: Run the proof**
 
 Run: `npm run prove:rbac`
-Expected: **17 passed, 0 failed**. (It was 13 before this task.)
+Expected: **18 passed, 0 failed**. (It was 13 before this task.)
 
-If assertion 17 fails, the write policy is too strict — fix `0015_event_images.sql`, re-run `npm run db:migrate`, re-run. If 14/15/16 fail, the policy is too loose. Do not proceed until this is 17/17.
+If assertion 17 fails, the write policy is too strict — fix `0015_event_images.sql`, re-run `npm run db:migrate`, re-run. If 14/15/16 fail, the policy is too loose. If 18 fails, the policy became stricter than the accepted design — do not "fix" it by loosening 14/15; escalate. Do not proceed until this is 18/18.
 
 - [ ] **Step 4: Commit**
 
@@ -713,22 +725,98 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 9: End-to-end verification
+### Task 9: Reap event images when an event is deleted
+
+Found by the Task 2 review; accepted as in-scope. `deleteEvent` **soft**-deletes
+(`UPDATE events SET deleted_at`), so `event_images`' `on delete cascade` never
+fires in the running app. Nothing else reaps images. And `media_public_read` is
+unconditional (`using (bucket_id = 'media')`), so the bytes stay fetchable at
+their direct URL forever after an event is deleted — paths are unguessable
+UUIDs, so it is not enumerable, but a previously-obtained URL never dies.
+
+**Files:**
+- Modify: `src/app/admin/events/actions.ts` (the existing `deleteEvent`)
+
+**Interfaces:**
+- Consumes: `deleteEvent` (existing), `event_images` (Task 2), the `media` bucket.
+
+- [ ] **Step 1: Read the existing `deleteEvent` first**
+
+It is at roughly `src/app/admin/events/actions.ts:93-102`. Note it calls
+`requireClusterAccess` first, then soft-deletes. Do not change that shape.
+
+- [ ] **Step 2: Reap images as part of the soft delete**
+
+Insert after the guard and **before** the soft-delete update, so a failure to
+reap does not leave an event that looks deleted but still serves images:
+
+```ts
+  // Soft-deleting the event hides it, but event_images' ON DELETE CASCADE never
+  // fires (we never hard-delete), and media_public_read serves any object in the
+  // bucket regardless of its event's state. So reap explicitly: without this the
+  // bytes stay live at their direct URL forever after the event is gone.
+  const svc = createServiceClient();
+  const { data: imgs } = await svc.from("event_images").select("id, path").eq("event_id", id);
+  if (imgs && imgs.length > 0) {
+    await svc.storage.from("media").remove(imgs.map((i) => i.path));
+    await svc.from("event_images").delete().eq("event_id", id);
+  }
+```
+
+- [ ] **Step 3: Prove it**
+
+Add to `scripts/prove-uploads.mjs` an assertion that after `deleteEvent`-style
+soft deletion, no `event_images` rows remain for that event AND the object is
+gone from the bucket. Because `deleteEvent` is a server action requiring an auth
+context, assert the underlying behavior directly against the DB/bucket rather
+than importing the action: insert an event + image + object, run the same reap
+sequence, then assert `event_images` is empty for that event and
+`storage.from("media").list()` no longer shows the object. Include a positive
+control that the object existed before the reap — otherwise the assertion passes
+trivially if the upload silently failed.
+
+- [ ] **Step 4: Run**
+
+Run: `npm run prove:uploads`
+Expected: all prior assertions still pass, plus the new reap assertions.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/admin/events/actions.ts scripts/prove-uploads.mjs
+git commit -m "fix: reap event images and storage objects when an event is deleted
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 10: End-to-end verification
 
 **Files:** none (verification only).
 
 - [ ] **Step 1: Full automated suite**
 
 Run each and record actual output:
+**First: kill any running `next dev` server.** A stray dev server shares the
+`.next` directory and silently clobbers production build output after
+`next build` finishes, making on-disk verification unreliable (found during
+Task 1).
+
 ```bash
 npx tsc --noEmit
 npm run lint
 npm run build
-npm run prove:rbac      # expect 17 passed, 0 failed
-npm run prove:uploads   # expect 7 passed, 0 failed
+npm run prove:rbac      # expect 18 passed, 0 failed
+npm run prove:uploads   # expect 7 base assertions + Task 9's reap assertions
 npm run prove:behaviors
 npm run prove:concurrency
 ```
+
+Note: `npm run build`'s route table will NOT visibly mark the homepage as ISR —
+Next 15.1.6 cannot annotate ISR for App Router pages. Verify via
+`.next/prerender-manifest.json` (`routes["/"].initialRevalidateSeconds === 60`)
+instead. Do not "fix" a working homepage because the table looks unchanged.
 
 - [ ] **Step 2: Manual verification**
 
@@ -740,6 +828,8 @@ Run `npm run dev`, then confirm and report each:
 5. An event with **no** uploads → renders its `cover` exactly as before.
 6. Homepage reflects a newly created event (the Task 1 fix).
 7. Attempt to upload a `.txt` renamed to `.jpg` → rejected with a clear message.
+8. Delete an event that HAS images → its `event_images` rows are gone and its
+   objects are gone from the bucket (Task 9's reap).
 
 - [ ] **Step 3: Report**
 
