@@ -332,7 +332,7 @@ Pure functions, no I/O — the security-critical part, isolated so it can be pro
   - `ALLOWED_MIME: readonly string[]`
   - `MAX_BYTES: number` (5242880), `MAX_FILES: number` (10)
   - `sniffImageType(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null`
-  - `validateImage(bytes: Uint8Array, declaredMime: string, size: number): { ok: true; mime: string } | { ok: false; reason: string }`
+  - `validateImage(bytes: Uint8Array, size: number): { ok: true; mime: string } | { ok: false; reason: string }`
   - `objectKey(eventId: string, mime: string): string`
   - `publicUrl(path: string): string`
 
@@ -362,12 +362,18 @@ check("sniffs jpeg", sniffImageType(JPEG) === "image/jpeg", sniffImageType(JPEG)
 check("sniffs png",  sniffImageType(PNG)  === "image/png",  sniffImageType(PNG));
 check("sniffs webp", sniffImageType(WEBP) === "image/webp", sniffImageType(WEBP));
 
-// The core security assertion: a forged MIME must not survive the sniff.
-check("REJECTS exe forged as image/jpeg", validateImage(EXE, "image/jpeg", EXE.length).ok === false, validateImage(EXE, "image/jpeg", EXE.length));
-check("REJECTS svg (script vector)",      validateImage(SVG, "image/svg+xml", SVG.length).ok === false, validateImage(SVG, "image/svg+xml", SVG.length));
-check("REJECTS oversized file",           validateImage(JPEG, "image/jpeg", MAX_BYTES + 1).ok === false, validateImage(JPEG, "image/jpeg", MAX_BYTES + 1));
+// The core security assertion: the bytes decide, so a forged declaration is irrelevant.
+check("REJECTS exe (MZ) even if the client calls it a jpeg", validateImage(EXE, EXE.length).ok === false, validateImage(EXE, EXE.length));
+check("REJECTS svg (script vector)",      validateImage(SVG, SVG.length).ok === false, validateImage(SVG, SVG.length));
+check("REJECTS oversized file",           validateImage(JPEG, MAX_BYTES + 1).ok === false, validateImage(JPEG, MAX_BYTES + 1));
 // Positive control — without this an always-reject bug would pass everything above.
-check("ACCEPTS a real jpeg",              validateImage(JPEG, "image/jpeg", JPEG.length).ok === true, validateImage(JPEG, "image/jpeg", JPEG.length));
+check("ACCEPTS a real jpeg",              validateImage(JPEG, JPEG.length).ok === true, validateImage(JPEG, JPEG.length));
+// The renamed-file case: a real PNG that a browser labels image/jpeg (because the
+// user renamed it .jpg) must be ACCEPTED and reported as png, so the caller stores
+// the correct contentType. Guards against reintroducing a declared-vs-actual check.
+const pngResult = validateImage(PNG, PNG.length);
+check("ACCEPTS a real png regardless of what the client called it",
+      pngResult.ok === true && pngResult.mime === "image/png", pngResult);
 
 console.log("─".repeat(48));
 console.log(`${pass} passed, ${fail} failed`);
@@ -408,17 +414,20 @@ export function sniffImageType(b: Uint8Array): "image/jpeg" | "image/png" | "ima
   return null;
 }
 
+/**
+ * The sniffed type is the SINGLE SOURCE OF TRUTH. The client's declared MIME is
+ * deliberately not consulted: it adds no safety (the sniff already proves the
+ * bytes are jpeg/png/webp) and cross-checking it only rejects legitimate files —
+ * e.g. a real PNG renamed to .jpg, which browsers label image/jpeg. Callers must
+ * store the returned `mime`, never the client's.
+ */
 export function validateImage(
-  bytes: Uint8Array, declaredMime: string, size: number,
+  bytes: Uint8Array, size: number,
 ): { ok: true; mime: string } | { ok: false; reason: string } {
   if (size > MAX_BYTES) return { ok: false, reason: `File exceeds the ${MAX_BYTES / 1024 / 1024}MB limit.` };
   if (size === 0) return { ok: false, reason: "File is empty." };
   const sniffed = sniffImageType(bytes);
   if (!sniffed) return { ok: false, reason: "Not a JPEG, PNG, or WebP image." };
-  if (!ALLOWED_MIME.includes(declaredMime as (typeof ALLOWED_MIME)[number])) {
-    return { ok: false, reason: `Unsupported type ${declaredMime}.` };
-  }
-  if (sniffed !== declaredMime) return { ok: false, reason: "File contents do not match its declared type." };
   return { ok: true, mime: sniffed };
 }
 ```
@@ -445,7 +454,7 @@ export function publicUrl(path: string): string {
 - [ ] **Step 5: Run the proof**
 
 Run: `npm run prove:uploads`
-Expected: **7 passed, 0 failed**.
+Expected: **8 passed, 0 failed**.
 
 - [ ] **Step 6: Commit**
 
@@ -501,7 +510,7 @@ export async function uploadEventImages(eventId: string, form: FormData): Promis
 
   for (const file of files) {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const v = validateImage(bytes, file.type, file.size);
+    const v = validateImage(bytes, file.size);
     if (!v.ok) return { error: `${file.name}: ${v.reason}` };
 
     const key = objectKey(eventId, v.mime);
@@ -808,7 +817,7 @@ npx tsc --noEmit
 npm run lint
 npm run build
 npm run prove:rbac      # expect 19 passed, 0 failed
-npm run prove:uploads   # expect 7 base assertions + Task 9's reap assertions
+npm run prove:uploads   # expect 8 base assertions + Task 9 reap assertions
 npm run prove:behaviors
 npm run prove:concurrency
 ```
