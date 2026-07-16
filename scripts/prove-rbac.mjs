@@ -36,8 +36,10 @@ async function authedClient(email) {
   const stamp = Date.now();
   const pyhEmail = `prove_pyh_${stamp}@test.com`;
   const chEmail = `prove_ch_${stamp}@test.com`;
+  const targetEmail = `prove_target_${stamp}@test.com`;
   const pyhId = await mkUser(pyhEmail);
   const chId = await mkUser(chEmail);
+  const targetId = await mkUser(targetEmail);
 
   const { data: clusters } = await admin.from("clusters").select("id,name").order("name");
   const clusterA = clusters[0].id, clusterB = clusters[1].id;
@@ -75,20 +77,26 @@ async function authedClient(email) {
   const insB = await ch.from("events").insert({ name: "CH bad", date: "2026-12-02", registration_deadline: deadline, slots_total: 5, cluster_id: clusterB, created_by: chId }).select("id");
   check("CH CANNOT insert event in cluster B", !!insB.error || (insB.data?.length ?? 0) === 0, insB.error?.message ?? insB.data);
 
-  // 7. CH CANNOT write to admins (create a user)
-  const insAdmin = await ch.from("admins").insert({ user_id: pyhId, role: "cluster_head" }).select("id");
-  check("CH CANNOT write admins", !!insAdmin.error || (insAdmin.data?.length ?? 0) === 0, insAdmin.error?.message ?? insAdmin.data);
+  // 7. CH CANNOT write to admins (create a user) — targetId is a real, novel
+  // user (satisfies the FK, no existing admins row, so no unique-key clash),
+  // so only the admins_pyh_write RLS policy can block this insert.
+  const insAdmin = await ch.from("admins").insert({ user_id: targetId, role: "cluster_head", cluster_id: clusterA }).select("id");
+  check("CH CANNOT write admins", (insAdmin.data?.length ?? 0) === 0, insAdmin.error?.message ?? insAdmin.data);
 
-  // 8. CH CANNOT read audit_log (PYH-only)
-  const auditRead = await ch.from("audit_log").select("id").limit(1);
-  check("CH CANNOT read audit_log", (auditRead.data?.length ?? 0) === 0, auditRead.data);
+  // 8. CH CANNOT read audit_log (PYH-only) — seed a real row via service-role
+  // first so an empty table can't masquerade as RLS working.
+  await admin.from("audit_log").insert({ actor_user_id: pyhId, action: "rbac.proof.marker", entity: "auth", entity_id: "prove-rbac" });
+  const auditRead = await ch.from("audit_log").select("id").limit(5);
+  check("CH CANNOT read audit_log (row exists but hidden)", (auditRead.data?.length ?? 0) === 0, auditRead.data);
 
   // cleanup
   await admin.from("events").delete().in("cluster_id", [clusterA, clusterB]).like("name", "RBAC %");
   await admin.from("events").delete().eq("name", "CH new");
-  await admin.from("admins").delete().in("user_id", [pyhId, chId]);
+  await admin.from("audit_log").delete().eq("action", "rbac.proof.marker");
+  await admin.from("admins").delete().in("user_id", [pyhId, chId, targetId]);
   await admin.auth.admin.deleteUser(pyhId);
   await admin.auth.admin.deleteUser(chId);
+  await admin.auth.admin.deleteUser(targetId);
 
   console.log("─".repeat(48));
   console.log(`${pass} passed, ${fail} failed`);
