@@ -51,14 +51,19 @@ const authed = async (email) => { const c = createClient(url, anonKey, { auth: {
 
 const stamp = Date.now();
 const pyhEmail = `pages_pyh_${stamp}@test.com`, chEmail = `pages_ch_${stamp}@test.com`;
-const pyhId = await mkUser(pyhEmail), chId = await mkUser(chEmail);
-const { data: clusters } = await admin.from("clusters").select("id").order("name");
-await admin.from("admins").upsert({ user_id: pyhId, role: "provincial_youth_head", is_active: true, full_name: "Pages PYH" }, { onConflict: "user_id" });
-await admin.from("admins").upsert({ user_id: chId, role: "cluster_head", cluster_id: clusters[0].id, is_active: true, full_name: "Pages CH" }, { onConflict: "user_id" });
-
-const { data: about } = await admin.from("pages").select("id").eq("slug", "about").single();
-const { data: secs } = await admin.from("pages").select("id, page_sections(type)").eq("slug", "about").single();
+// Declared before the try so the finally can clean up whatever setup created,
+// even if setup itself (user creation, admin upsert, seed fetch) throws.
+let pyhId, chId;
 try {
+  pyhId = await mkUser(pyhEmail);
+  chId = await mkUser(chEmail);
+  const { data: clusters } = await admin.from("clusters").select("id").order("name");
+  await admin.from("admins").upsert({ user_id: pyhId, role: "provincial_youth_head", is_active: true, full_name: "Pages PYH" }, { onConflict: "user_id" });
+  await admin.from("admins").upsert({ user_id: chId, role: "cluster_head", cluster_id: clusters[0].id, is_active: true, full_name: "Pages CH" }, { onConflict: "user_id" });
+
+  const { data: about } = await admin.from("pages").select("id").eq("slug", "about").single();
+  const { data: secs } = await admin.from("pages").select("id, page_sections(id, type)").eq("slug", "about").single();
+  const sectionId = secs?.page_sections?.[0]?.id;
   check("About page is seeded with 5 sections", (secs?.page_sections?.length ?? 0) === 5, secs?.page_sections?.length);
 
   const anonC = createClient(url, anonKey, { auth: { persistSession: false } });
@@ -71,14 +76,20 @@ try {
   const ch = await authed(chEmail);
   const chWrite = await ch.from("pages").update({ seo_title: "hacked" }).eq("id", about.id).select("id");
   check("cluster head CANNOT write pages", (chWrite.data?.length ?? 0) === 0, chWrite.data);
+  const chWriteSec = await ch.from("page_sections").update({ visible: false }).eq("id", sectionId).select("id");
+  check("cluster head CANNOT write page_sections", (chWriteSec.data?.length ?? 0) === 0, chWriteSec.data);
 
   const pyh = await authed(pyhEmail);
   const pyhWrite = await pyh.from("pages").update({ seo_title: "About" }).eq("id", about.id).select("id");
   check("PYH CAN write pages (positive control)", !pyhWrite.error && pyhWrite.data?.length === 1, pyhWrite.error?.message);
+  // page_sections positive control: set visible=true (its seeded value) so the write
+  // is non-destructive; a passing RLS write still returns the affected row.
+  const pyhWriteSec = await pyh.from("page_sections").update({ visible: true }).eq("id", sectionId).select("id");
+  check("PYH CAN write page_sections (positive control)", !pyhWriteSec.error && pyhWriteSec.data?.length === 1, pyhWriteSec.error?.message);
 } finally {
-  await admin.auth.admin.deleteUser(pyhId);
-  await admin.auth.admin.deleteUser(chId);
-  await admin.from("admins").delete().in("user_id", [pyhId, chId]);
+  if (pyhId) await admin.auth.admin.deleteUser(pyhId);
+  if (chId) await admin.auth.admin.deleteUser(chId);
+  await admin.from("admins").delete().in("user_id", [pyhId, chId].filter(Boolean));
 }
 
 console.log("─".repeat(48));
