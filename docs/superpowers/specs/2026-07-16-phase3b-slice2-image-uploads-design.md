@@ -68,6 +68,21 @@ A single Supabase Storage bucket, `media`, created in migration `0014_storage_me
 
 - **Public read.** These are public-website images; signed URLs would defeat CDN
   caching and Next/Image optimization for no security benefit.
+
+> **Known consequence, measured during Task 10 verification.** A public bucket is
+> CDN-cached, and the bucket serves `cache-control: public, max-age=3600`. When an
+> image is deleted, storage removes it immediately — `list()` is empty and
+> `download()` returns "Object not found" — but the **public URL keeps returning
+> HTTP 200 from the Cloudflare cache (`cf-cache: HIT`) for up to an hour**. A
+> cache-busted request returns 400, confirming the object is gone at origin; a
+> `no-cache` request does **not** bypass the edge. So "deleted" means "gone from
+> storage and from the site", not "immediately unreachable to anyone already
+> holding the URL". Object keys are unguessable UUIDs, so this is not enumerable —
+> the exposure is limited to a URL someone already obtained while the image was
+> live. This is inherent to the public-read choice above, not a defect in the reap.
+> If an image ever needs to be *retractable on demand*, that requires either a
+> lower `cacheControl` on upload (more origin traffic) or signed URLs (which this
+> spec rejects for the reasons stated). **Deferred, documented, not fixed.**
 - **Writes via service-role only.** Uploads go through a guarded server action, never
   from the browser directly. This keeps one authorization model (the existing guards)
   rather than introducing a second one in storage RLS.
