@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 const { parseSectionContent, SECTION_TYPES } = await import("../src/lib/pages/content-schemas.ts");
 const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
+const { collectImagePaths, reapPaths } = await import("../src/lib/pages/reap.ts");
 
 let pass = 0, fail = 0;
 const check = (n, c, got) => c ? (pass++, console.log(`  PASS  ${n}`)) : (fail++, console.log(`  FAIL  ${n}  got=${JSON.stringify(got)}`));
@@ -38,8 +39,6 @@ check("About fallback has 5 sections matching the seed",
   PAGE_FALLBACK.about?.sections?.length === 5, PAGE_FALLBACK.about?.sections?.length);
 check("every fallback section validates against its schema",
   PAGE_FALLBACK.about.sections.every((s) => parseSectionContent(s.type, s.content).ok), null);
-
-// (RLS and reap assertions are appended in later tasks.)
 
 // ── 2. RLS + seed (against the hosted DB) ───────────────────────────────────
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -97,6 +96,22 @@ try {
   if (chId) await admin.auth.admin.deleteUser(chId);
   await admin.from("admins").delete().in("user_id", [pyhId, chId].filter(Boolean));
 }
+
+// ── 3. Reap (real prod code path, mirrors prove-uploads) ────────────────────
+check("collectImagePaths ignores external (objectPath:null) images",
+  collectImagePaths({ image: { src: "https://x/y.jpg", objectPath: null } }).length === 0, null);
+check("collectImagePaths finds owned object paths (incl. nested lists)",
+  collectImagePaths({ items: [{ image: { objectPath: "pages/about/a.webp" } }] }).join() === "pages/about/a.webp", null);
+
+// Upload a real object, reap it via the shared helper, assert it's gone.
+const RIFF = new Uint8Array([0x52,0x49,0x46,0x46, 0,0,0,0, 0x57,0x45,0x42,0x50]);
+const key = `pages/_prove/${stamp}.webp`;
+const up = await admin.storage.from("media").upload(key, RIFF, { contentType: "image/webp", upsert: true });
+check("test object uploaded (positive control)", !up.error, up.error?.message);
+const reap = await reapPaths(admin, [key]);
+check("reapPaths returns no error", !reap.error, reap.error);
+const dl = await admin.storage.from("media").download(key);
+check("object is gone after reap", !!dl.error, "still downloadable");
 
 console.log("─".repeat(48));
 console.log(`${pass} passed, ${fail} failed`);
