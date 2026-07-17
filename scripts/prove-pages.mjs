@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 const { parseSectionContent, SECTION_TYPES } = await import("../src/lib/pages/content-schemas.ts");
+const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
 
 let pass = 0, fail = 0;
 const check = (n, c, got) => c ? (pass++, console.log(`  PASS  ${n}`)) : (fail++, console.log(`  FAIL  ${n}  got=${JSON.stringify(got)}`));
@@ -33,7 +34,12 @@ check("text-image rejects a non-URL image src",
 check("text-image accepts valid content",
   parseSectionContent("text-image", { image: { src: "https://example.com/img.jpg", alt: "desc", width: 800, height: 600, objectPath: null }, eyebrow: "e", title: "t", subtitle: "s", body: "b" }).ok === true, null);
 
-// (RLS, fallback, and reap assertions are appended in later tasks.)
+check("About fallback has 5 sections matching the seed",
+  PAGE_FALLBACK.about?.sections?.length === 5, PAGE_FALLBACK.about?.sections?.length);
+check("every fallback section validates against its schema",
+  PAGE_FALLBACK.about.sections.every((s) => parseSectionContent(s.type, s.content).ok), null);
+
+// (RLS and reap assertions are appended in later tasks.)
 
 // ── 2. RLS + seed (against the hosted DB) ───────────────────────────────────
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
