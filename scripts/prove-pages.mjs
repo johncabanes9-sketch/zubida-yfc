@@ -104,14 +104,20 @@ check("collectImagePaths finds owned object paths (incl. nested lists)",
   collectImagePaths({ items: [{ image: { objectPath: "pages/about/a.webp" } }] }).join() === "pages/about/a.webp", null);
 
 // Upload a real object, reap it via the shared helper, assert it's gone.
+// The finally guarantees the test object never leaks into the shared bucket
+// even if reapPaths regresses or throws (mirrors prove-uploads.mjs).
 const RIFF = new Uint8Array([0x52,0x49,0x46,0x46, 0,0,0,0, 0x57,0x45,0x42,0x50]);
 const key = `pages/_prove/${stamp}.webp`;
-const up = await admin.storage.from("media").upload(key, RIFF, { contentType: "image/webp", upsert: true });
-check("test object uploaded (positive control)", !up.error, up.error?.message);
-const reap = await reapPaths(admin, [key]);
-check("reapPaths returns no error", !reap.error, reap.error);
-const dl = await admin.storage.from("media").download(key);
-check("object is gone after reap", !!dl.error, "still downloadable");
+try {
+  const up = await admin.storage.from("media").upload(key, RIFF, { contentType: "image/webp", upsert: true });
+  check("test object uploaded (positive control)", !up.error, up.error?.message);
+  const reap = await reapPaths(admin, [key]);
+  check("reapPaths returns no error", !reap.error, reap.error);
+  const dl = await admin.storage.from("media").download(key);
+  check("object is gone after reap", !!dl.error, "still downloadable");
+} finally {
+  await admin.storage.from("media").remove([key]); // best-effort; no-op if reap already removed it
+}
 
 console.log("─".repeat(48));
 console.log(`${pass} passed, ${fail} failed`);
