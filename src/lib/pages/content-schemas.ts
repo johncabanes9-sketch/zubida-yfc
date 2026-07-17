@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { ICON_NAMES } from "./icons.ts";
+import { ICON_NAMES, type IconName } from "./icons.ts";
 
-const iconName = z.enum(ICON_NAMES as [string, ...string[]]);
+// Cast preserves the literal union so inferred content types keep `icon: IconName`
+// (a plain-string tuple would erase the allowlist at the type level).
+const iconName = z.enum(ICON_NAMES as [IconName, ...IconName[]]);
 const text = z.string().min(1).max(400);
 const longText = z.string().min(1).max(2000);
 
