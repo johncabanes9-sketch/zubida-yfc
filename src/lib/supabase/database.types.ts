@@ -139,3 +139,27 @@ export interface NavItemRow {
   sort_order: number;
   visible: boolean;
 }
+
+export interface PageRow {
+  id: string;
+  slug: string;
+  title: string;
+  seo_title: string | null;
+  seo_description: string | null;
+  og_image_path: string | null;
+  is_system: boolean;
+  visible: boolean;
+  sort_order: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface PageSectionRow {
+  id: string;
+  page_id: string;
+  type: string;
+  content: unknown;
+  sort_order: number;
+  visible: boolean;
+  updated_at: string;
+}
