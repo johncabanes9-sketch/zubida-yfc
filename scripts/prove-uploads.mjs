@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 const { validateImage, sniffImageType, MAX_BYTES } = await import("../src/lib/images/validate.ts");
+const { reapEventImages } = await import("../src/lib/images/reap.ts");
 
 let pass = 0, fail = 0;
 const check = (n, c, got) => c ? (pass++, console.log(`  PASS  ${n}`)) : (fail++, console.log(`  FAIL  ${n}  got=${JSON.stringify(got)}`));
@@ -34,12 +35,13 @@ check("ACCEPTS a real png regardless of what the client called it",
 
 // ── Reap-on-delete: event_images + storage object must not outlive the event ──
 // deleteEvent is a server action (auth context + Next.js request scope), so it
-// can't be invoked from a plain node script. Instead we replicate the exact
-// reap sequence from src/app/admin/events/actions.ts against the real hosted
-// DB and bucket, and assert on the outcome. This proves the SEQUENCE is
-// correct; it does NOT exercise deleteEvent itself (its auth guards, its
-// soft-delete write) — that end-to-end path is covered by Task 10's manual
-// verification.
+// can't be invoked from a plain node script. Instead we import and call the
+// REAL reapEventImages() (src/lib/images/reap.ts) — the same function
+// deleteEvent calls — against the real hosted DB and bucket, and assert on
+// the outcome. This exercises the actual reap code path, not a hand-mirrored
+// copy, so a future edit to reap.ts can't drift out of sync with this test.
+// It does NOT exercise deleteEvent's auth guards or its soft-delete write —
+// that end-to-end path is covered by Task 10's manual verification.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !service) {
@@ -87,12 +89,9 @@ const admin = createClient(url, service, { auth: { persistSession: false } });
     const existedBefore = !before.error && before.data?.some((f) => f.name === filename);
     check("POSITIVE CONTROL: object exists in bucket before reap", existedBefore, before.error?.message ?? before.data);
 
-    // Replicate deleteEvent's reap sequence verbatim (src/app/admin/events/actions.ts).
-    const { data: imgs } = await admin.from("event_images").select("id, path").eq("event_id", eventId);
-    if (imgs && imgs.length > 0) {
-      await admin.storage.from("media").remove(imgs.map((i) => i.path));
-      await admin.from("event_images").delete().eq("event_id", eventId);
-    }
+    // Call the REAL reap function — the same one deleteEvent calls.
+    const reapResult = await reapEventImages(admin, eventId);
+    check("reapEventImages returns no error on the happy path", !reapResult.error, reapResult.error);
 
     const rowsAfter = await admin.from("event_images").select("id").eq("event_id", eventId);
     check("event_images rows gone after reap", (rowsAfter.data?.length ?? -1) === 0, rowsAfter.data);
