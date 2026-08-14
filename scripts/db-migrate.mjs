@@ -1,10 +1,10 @@
 // Hosted-Supabase migration runner (replaces `supabase db reset` on machines
 // without Docker). Applies supabase/migrations/*.sql in filename order, tracks
-// applied files in a _migrations table, then applies supabase/seed.sql.
+// applied files in a _migrations table. Seeding is opt-in.
 //
 // Usage:
-//   node scripts/db-migrate.mjs          # apply pending migrations + seed
-//   node scripts/db-migrate.mjs --seed   # (re)apply seed only
+//   node scripts/db-migrate.mjs          # apply pending migrations only
+//   node scripts/db-migrate.mjs --seed   # apply supabase/seed.sql only
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -78,7 +78,10 @@ async function applySeed() {
       const n = await applyMigrations();
       console.log(`Migrations: ${n} applied.`);
     }
-    await applySeed();
+    // Seeding is opt-in. It used to run on every migrate, which meant any
+    // fixture row in seed.sql was silently re-inserted into a live database
+    // after it had been deliberately retired.
+    if (seedOnly) await applySeed();
     console.log("Done.");
   } catch (e) {
     console.error("\nMigration error:", e.message);

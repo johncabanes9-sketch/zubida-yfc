@@ -1,9 +1,22 @@
--- seed.sql — idempotent import of Phase 1 mock events
-insert into events (name, cover, date, time, venue, organizer, description, registration_deadline, slots_total, slots_taken, status, scope)
-select * from (values
-  ('Zubida Provincial Youth Camp 2026','https://picsum.photos/seed/yfccamp/1000/700','2026-08-14'::date,'8:00 AM','Camp Abelardo, Pagadian City','Zubida YFC Provincial Team','Three days of worship, teaching, and encounter for youth across all 26 chapters.','2026-08-01'::timestamptz,600,418,'Open'::event_status,'Provincial'::event_scope),
-  ('ICON: Ignite Conference','https://picsum.photos/seed/yfcicon/1000/700','2026-09-06'::date,'1:00 PM','Pagadian City Convention Center','Provincial Youth Coordinator','The flagship one-day conference gathering young leaders.','2026-08-28'::timestamptz,900,611,'Open'::event_status,'Provincial'::event_scope),
-  ('Christian Life Seminar — Labangan','https://picsum.photos/seed/yfccls/1000/700','2026-07-26'::date,'9:00 AM','St. Isidore Parish, Labangan','Labangan Chapter','A weekend introduction to the heart of the Gospel.','2026-07-20'::timestamptz,120,120,'Closed'::event_status,'Chapter'::event_scope),
-  ('Household Leaders'' Formation','https://picsum.photos/seed/yfchousehold/1000/700','2026-07-19'::date,'2:00 PM','Molave Parish Hall','North Cluster','Practical formation for core group leaders.','2026-07-15'::timestamptz,80,54,'Open'::event_status,'Chapter'::event_scope)
-) as v(name, cover, date, time, venue, organizer, description, registration_deadline, slots_total, slots_taken, status, scope)
-where not exists (select 1 from events e where e.name = v.name and e.deleted_at is null);
+-- seed.sql — intentionally seeds NO event data.
+--
+-- This file used to insert four Phase-1 demo events (Zubida Provincial Youth
+-- Camp, ICON: Ignite Conference, Christian Life Seminar — Labangan, Household
+-- Leaders' Formation). They were invented for the showcase build: the venues,
+-- the slot counts, the picsum.photos covers, and the "all 26 chapters" claim
+-- have no source (ZUBIDA_CONTENT_AUDIT.md §2.4).
+--
+-- While `getEvents()` still fell back to the same mock list, they read as
+-- placeholders. Once the fallback was removed, these rows became the only thing
+-- `/events` could serve — genuine database records, with a working Register
+-- button, that a visitor cannot distinguish from a real event. Migration 0019
+-- retires the rows; emptying this file stops them coming back on the next
+-- `db:migrate` against any environment.
+--
+-- Events are records, not chrome. An empty schedule is a truthful schedule, and
+-- the honest empty state already exists. Real events belong in /admin/events.
+--
+-- If a future environment genuinely needs fixture data, add it behind an
+-- explicit flag — never to the default path.
+
+select 1 where false;
