@@ -31,6 +31,12 @@ export function SettingsForm({
           <textarea name="description" rows={3} required defaultValue={settings.description} className={field} /></label>
         <label className="block"><span className={label}>Province</span>
           <input name="province" required defaultValue={settings.province} className={field} /></label>
+        <label className="block"><span className={label}>Site URL</span>
+          <input type="url" name="site_url" required defaultValue={settings.site_url ?? ""} className={field} />
+          <span className="mt-1 block text-xs text-muted">
+            The public address of this site, e.g. https://zubidayfc.org. Used for
+            canonical links and link previews when a page is shared.
+          </span></label>
 
         <h2 className={heading}>Contact</h2>
         <label className="block"><span className={label}>Email</span>

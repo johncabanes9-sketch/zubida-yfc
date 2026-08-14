@@ -30,6 +30,7 @@ export async function updateSiteSettings(formData: FormData) {
       tagline: input.tagline,
       description: input.description,
       province: input.province,
+      site_url: input.site_url,
       email: input.email,
       phone: input.phone,
       office: input.office,

@@ -126,6 +126,8 @@ export interface SiteSettingsRow {
   office: string;
   facebook_url: string | null;
   instagram_url: string | null;
+  /** Canonical origin for metadataBase; null on rows predating migration 0018. */
+  site_url: string | null;
   footer_explore_heading: string;
   footer_reach_heading: string;
   footer_closing_line: string;

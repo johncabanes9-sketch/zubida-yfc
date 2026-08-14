@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { LoadingScreen } from "@/components/layout/loading-screen";
 import { FloatingVerse } from "@/components/shared/floating-verse";
 import { getSiteSettings } from "@/lib/data/site";
+import { SITE } from "@/lib/constants";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -21,10 +22,21 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+/** metadataBase drives canonical links and OG image URLs on every page, so an
+ *  unparseable value would break the whole site's metadata. Settings validation
+ *  rejects a malformed URL on save; this guards the rows that predate it. */
+function metadataBase(siteUrl: string): URL {
+  try {
+    return new URL(siteUrl);
+  } catch {
+    return new URL(SITE.url);
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const { site } = await getSiteSettings();
   return {
-    metadataBase: new URL("https://zubidayfc.org"),
+    metadataBase: metadataBase(site.siteUrl),
     title: {
       default: `${site.name} — ${site.tagline}`,
       template: `%s — ${site.name}`,
