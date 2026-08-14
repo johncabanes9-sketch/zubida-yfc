@@ -1,6 +1,5 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { events as mockEvents } from "@/data/events";
 import type { EventItem } from "@/data/types";
 import type { EventRow } from "@/lib/supabase/database.types";
 import { publicUrl } from "@/lib/images/paths";
@@ -10,11 +9,20 @@ type EventRowWithImages = EventRow & {
 };
 
 /**
- * Loads events from Supabase (real UUIDs, live slot counts). Falls back to the
- * Phase 1 mock data if the database is unreachable or empty, so the public site
- * always renders.
+ * `ok` carries the real event list — which may legitimately be empty when nothing
+ * is scheduled. `unavailable` means the query failed and we do not know what the
+ * real list is.
+ *
+ * These two states must stay distinct. Events are records, not page chrome: an
+ * outage must never be papered over with stand-in events, because a visitor
+ * cannot tell a placeholder event from a real one and would register for it.
  */
-export async function getEvents(): Promise<EventItem[]> {
+export type EventsResult =
+  | { status: "ok"; events: EventItem[] }
+  | { status: "unavailable"; events: [] };
+
+/** Loads events from Supabase (real UUIDs, live slot counts). */
+export async function getEvents(): Promise<EventsResult> {
   try {
     const db = createServiceClient();
     const { data, error } = await db
@@ -23,9 +31,9 @@ export async function getEvents(): Promise<EventItem[]> {
       .is("deleted_at", null)
       .order("date", { ascending: true });
 
-    if (error || !data || data.length === 0) return mockEvents;
+    if (error || !data) return { status: "unavailable", events: [] };
 
-    return (data as EventRowWithImages[]).map((e) => ({
+    const events = (data as EventRowWithImages[]).map((e) => ({
       id: e.id,
       name: e.name,
       cover: e.cover ?? "",
@@ -43,7 +51,9 @@ export async function getEvents(): Promise<EventItem[]> {
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((i) => ({ url: publicUrl(i.path), alt: i.alt ?? e.name })),
     }));
+
+    return { status: "ok", events };
   } catch {
-    return mockEvents;
+    return { status: "unavailable", events: [] };
   }
 }

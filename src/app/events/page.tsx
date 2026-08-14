@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
-  const events = await getEvents();
+  const { events, status } = await getEvents();
   return (
     <>
       <PageHeader
@@ -21,7 +21,7 @@ export default async function EventsPage() {
         subtitle="Provincial camps, conferences, Christian Life Seminars, and chapter missions — find your next encounter and register online."
       />
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <EventsBoard events={events} />
+        <EventsBoard events={events} status={status} />
       </section>
     </>
   );

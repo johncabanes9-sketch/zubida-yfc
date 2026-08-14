@@ -5,7 +5,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { getEvents } from "@/lib/data/events";
 
 export async function EventsPreview() {
-  const events = await getEvents();
+  const { events, status } = await getEvents();
   const upcoming = events
     .filter((e) => e.status !== "Finished")
     .slice(0, 3);
@@ -23,11 +23,26 @@ export async function EventsPreview() {
             View all events <ArrowRight className="h-4 w-4" />
           </ButtonLink>
         </div>
-        <div className="mt-12 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
-          {upcoming.map((e, i) => (
-            <EventCard key={e.id} event={e} delay={i * 0.1} />
-          ))}
-        </div>
+        {upcoming.length > 0 ? (
+          <div className="mt-12 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
+            {upcoming.map((e, i) => (
+              <EventCard key={e.id} event={e} delay={i * 0.1} />
+            ))}
+          </div>
+        ) : (
+          <div className="glass mt-12 rounded-3xl py-16 text-center">
+            <p className="font-display text-xl">
+              {status === "unavailable"
+                ? "The event schedule can't be loaded right now"
+                : "No upcoming events scheduled yet"}
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              {status === "unavailable"
+                ? "This is a temporary problem on our end. Please try again shortly."
+                : "Watch this space — the next gathering will be announced here."}
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );
