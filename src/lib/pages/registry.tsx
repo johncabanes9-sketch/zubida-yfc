@@ -43,8 +43,10 @@ export const REGISTRY: Record<string, SectionDef> = {
   "text-image": {
     label: "Text + image",
     schema: textImageSchema,
+    // No default image: a new section starts text-only and the editor uploads a
+    // real photo. Seeding a stock placeholder is how stand-in imagery ends up
+    // published as though it depicted the organization.
     defaultContent: {
-      image: { src: "https://picsum.photos/seed/new/900/700", alt: "", width: 900, height: 700, objectPath: null },
       eyebrow: "Eyebrow", title: "Title", subtitle: "Subtitle", body: "Body text.",
     },
     Component: TextImageSection,

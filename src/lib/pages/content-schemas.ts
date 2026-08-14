@@ -25,7 +25,10 @@ export const heroSchema = z.object({
 });
 
 export const textImageSchema = z.object({
-  image: sectionImage,
+  // Optional so a section can run text-only rather than being padded out with a
+  // stand-in photograph. A stock image captioned as a Zubida YFC gathering
+  // misrepresents the organization; no image at all does not.
+  image: sectionImage.nullable().optional(),
   eyebrow: text,
   title: text,
   subtitle: z.string().max(600),
