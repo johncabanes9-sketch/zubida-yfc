@@ -18,6 +18,9 @@ const read = (p) => readFileSync(join(root, p), "utf8");
 // names the province or quotes a retired figure is documentation, not output.
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const code = (p) => stripComments(read(p));
+// Same rule for SQL: a `--` line explaining which invented event was retired is
+// documentation, not something the file inserts.
+const sql = (p) => read(p).replace(/^\s*--.*$/gm, "");
 
 const { SITE } = await import("../src/lib/constants.ts");
 const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
@@ -168,6 +171,44 @@ check(
 check(
   "getEvents distinguishes an empty schedule from an unreachable one",
   eventsLib.includes('"unavailable"') && eventsLib.includes('"ok"'),
+  null,
+);
+
+// The audit's events check was originally run with the database DOWN, which only
+// exercised the fallback path. With the database UP, `seed.sql` had already put
+// four fabricated Phase-1 events into `events` — so removing the code fallback
+// did not stop them being served; it promoted them from stand-ins to records with
+// a working Register button. The seed is the remaining way they come back.
+const seedSql = sql("supabase/seed.sql");
+for (const invented of [
+  "Camp Abelardo",
+  "ICON: Ignite Conference",
+  "Zubida Provincial Youth Camp",
+  "Christian Life Seminar",
+  "Household Leaders",
+  "26 chapters",
+  "picsum.photos",
+]) {
+  check(`seed.sql does not insert "${invented}"`, !seedSql.includes(invented), invented);
+}
+
+// A seed that re-runs on every `db:migrate` cannot be trusted to stay empty by
+// convention alone — applying it must be an explicit choice.
+const migrator = code("scripts/db-migrate.mjs");
+check(
+  "db:migrate applies the seed only when --seed is passed",
+  /if\s*\(\s*seedOnly\s*\)\s*await applySeed\(\)/.test(migrator),
+  null,
+);
+
+// And the rows already sitting in the database have to be retired, not just
+// prevented from being re-inserted.
+const m19 = sql("supabase/migrations/0019_retire_demo_events.sql");
+check("migration 0019 soft-deletes the seeded demo events", /deleted_at\s*=\s*now\(\)/.test(m19), null);
+check("migration 0019 retires the load-test event", m19.includes("CONCURRENCY TEST"), null);
+check(
+  "migration 0019 only touches rows still carrying the seed signature",
+  m19.includes("picsum.photos") && m19.includes("deleted_at is null"),
   null,
 );
 
