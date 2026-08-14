@@ -13,7 +13,8 @@
     "prove:behaviors": "node scripts/prove-behaviors.mjs",
     "prove:rbac": "node scripts/prove-rbac.mjs",
     "prove:uploads": "node --experimental-strip-types scripts/prove-uploads.mjs",
-    "prove:pages": "node --experimental-strip-types scripts/prove-pages.mjs"
+    "prove:pages": "node --experimental-strip-types scripts/prove-pages.mjs",
+    "prove:content": "node --experimental-strip-types scripts/prove-content.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

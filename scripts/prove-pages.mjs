@@ -35,8 +35,10 @@ check("text-image rejects a non-URL image src",
 check("text-image accepts valid content",
   parseSectionContent("text-image", { image: { src: "https://example.com/img.jpg", alt: "desc", width: 800, height: 600, objectPath: null }, eyebrow: "e", title: "t", subtitle: "s", body: "b" }).ok === true, null);
 
-check("About fallback has 5 sections matching the seed",
-  PAGE_FALLBACK.about?.sections?.length === 5, PAGE_FALLBACK.about?.sections?.length);
+// 4, not the 5 seeded in 0016: migration 0017 hides the unverified history
+// timeline, and the fallback must mirror what the DB actually renders.
+check("About fallback has 4 visible sections matching the seed + 0017",
+  PAGE_FALLBACK.about?.sections?.length === 4, PAGE_FALLBACK.about?.sections?.length);
 check("every fallback section validates against its schema",
   PAGE_FALLBACK.about.sections.every((s) => parseSectionContent(s.type, s.content).ok), null);
 
