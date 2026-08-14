@@ -7,6 +7,7 @@ import { FeaturedPhotos } from "@/components/home/featured-photos";
 import { Testimonials } from "@/components/home/testimonials";
 import { VerseBanner } from "@/components/home/verse-banner";
 import { getSiteSettings } from "@/lib/data/site";
+import { isVerified } from "@/lib/content/fixtures";
 
 // The homepage renders <EventsPreview />, which reads live events. Without this
 // it is prerendered at build and serves stale (or, on an empty table, mock)
@@ -17,13 +18,16 @@ export default async function HomePage() {
   const { site } = await getSiteSettings();
   return (
     <>
-      <Hero province={site.province} />
+      <Hero province={site.province} name={site.name} description={site.description} />
       <StatsBand />
       <AboutTeaser />
       <EventsPreview />
-      <NewsPreview />
-      <FeaturedPhotos />
-      <Testimonials />
+      {/* News, photos, and testimonials are omitted entirely rather than shown
+          with Phase-1 placeholder content — an absent section is honest, a
+          section filled with invented stories is not. */}
+      {isVerified("news") && <NewsPreview />}
+      {isVerified("gallery") && <FeaturedPhotos />}
+      {isVerified("testimonials") && <Testimonials />}
       <VerseBanner />
     </>
   );

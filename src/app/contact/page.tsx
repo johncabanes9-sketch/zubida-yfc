@@ -56,24 +56,30 @@ export default async function ContactPage() {
                 </Reveal>
               ))}
 
-              <Reveal delay={0.3}>
-                <div className="flex gap-3">
-                  <a
-                    href={site.socials.facebook}
-                    aria-label="Facebook"
-                    className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
-                  >
-                    <Facebook className="h-5 w-5" />
-                  </a>
-                  <a
-                    href={site.socials.instagram}
-                    aria-label="Instagram"
-                    className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
-                  >
-                    <Instagram className="h-5 w-5" />
-                  </a>
-                </div>
-              </Reveal>
+              {(site.socials.facebook || site.socials.instagram) && (
+                <Reveal delay={0.3}>
+                  <div className="flex gap-3">
+                    {site.socials.facebook && (
+                      <a
+                        href={site.socials.facebook}
+                        aria-label="Facebook"
+                        className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
+                      >
+                        <Facebook className="h-5 w-5" />
+                      </a>
+                    )}
+                    {site.socials.instagram && (
+                      <a
+                        href={site.socials.instagram}
+                        aria-label="Instagram"
+                        className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
+                      >
+                        <Instagram className="h-5 w-5" />
+                      </a>
+                    )}
+                  </div>
+                </Reveal>
+              )}
 
               {/* Stylized map placeholder */}
               <Reveal delay={0.35}>

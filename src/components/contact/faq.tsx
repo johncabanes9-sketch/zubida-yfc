@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: "How do I register for an event?",
-    a: "Head to the Events page, open any event marked 'Open,' and click Register. Fill out the form and you'll receive a confirmation with your QR pass. (Online registration is rolling out — some chapters still register in person.)",
+    a: "Head to the Events page, open any event marked 'Open,' and click Register. Fill out the form and you'll receive a confirmation with your QR pass.",
   },
   {
     q: "Is there a membership fee?",

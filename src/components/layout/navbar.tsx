@@ -15,7 +15,7 @@ export function Navbar({
   site = SITE,
   navLinks = NAV_LINKS,
 }: {
-  site?: { name: string };
+  site?: { name: string; province: string };
   navLinks?: { href: string; label: string }[];
 } = {}) {
   const pathname = usePathname();
@@ -52,7 +52,7 @@ export function Navbar({
               {site.name}
             </span>
             <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted">
-              Zamboanga del Sur
+              {site.province}
             </span>
           </span>
         </Link>

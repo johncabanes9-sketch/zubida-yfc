@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { ChaptersExplorer } from "@/components/chapters/chapters-explorer";
+import { UnpublishedNotice } from "@/components/shared/unpublished-notice";
+import { isVerified } from "@/lib/content/fixtures";
 
 export const metadata: Metadata = {
   title: "Chapters",
@@ -11,13 +13,22 @@ export const metadata: Metadata = {
 export default function ChaptersPage() {
   return (
     <>
+      {/* Title carried the unverified "twenty-six" figure; the count is not
+          published anywhere until the real chapter roster is confirmed. */}
       <PageHeader
         eyebrow="Our Chapters"
-        title="One province, twenty-six homes"
+        title="One province, many homes"
         subtitle="From the bay of Pagadian to the hills of the north, find the Zubida YFC chapter nearest you and see what God is doing there."
       />
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <ChaptersExplorer />
+        {isVerified("chapters") ? (
+          <ChaptersExplorer />
+        ) : (
+          <UnpublishedNotice
+            title="Our chapter directory isn't published yet"
+            detail="Chapter locations, meeting schedules, and coordinators are being confirmed with the provincial team. To find the chapter nearest you in the meantime, please get in touch through our Contact page."
+          />
+        )}
       </section>
     </>
   );
