@@ -284,7 +284,7 @@ An empty `events` table is a legitimate state ("no events scheduled yet"). Treat
 Copy quality is high — no spelling or grammar errors found, capitalization is consistent, no Lorem Ipsum, no broken sentences. Issues are limited to:
 
 1. `faq.tsx:15` — "(Online registration is rolling out — some chapters still register in person.)" — a development-status hedge exposed to end users.
-2. `src/components/shared/fake-qr.tsx` — component named `fake-qr`, documented as "Purely visual placeholder for the Phase 1 preview". Needs a check that no user-facing surface still renders it now that `src/lib/qr.ts` exists.
+2. ~~`src/components/shared/fake-qr.tsx` — component named `fake-qr`, documented as "Purely visual placeholder for the Phase 1 preview". Needs a check that no user-facing surface still renders it now that `src/lib/qr.ts` exists.~~ **RESOLVED:** `FakeQR` was superseded in phase 2 and left orphaned — defined but imported nowhere, while `registration-form.tsx:99` renders the real server-generated QR. It rendered a meaningless decorative pattern under `aria-label="Registration QR code"`, so an accidental import would have handed users an unscannable "event pass". Component deleted.
 3. Leader social links are all `"#"` — clickable icons that navigate nowhere.
 4. Admin stat label "Total" is ambiguous.
 
