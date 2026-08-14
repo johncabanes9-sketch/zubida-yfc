@@ -21,7 +21,7 @@ Five consequences, all verified live:
 2. **`ADR-2` — Fabricated statistics.** The homepage stats band publishes four hard numbers (26 / 4,200+ / 58 / 340+) that are not derived from any data source and are internally contradicted by the app's own fixtures. See §5.
 3. **`ADR-3` — The About page is DB-driven but not editable.** Migration `0016` moved About into `pages`/`page_sections`, and `src/app/admin/pages/actions.ts` exists (staged, uncommitted), but **`/admin/pages` has no `page.tsx`** — Task 7 of the page-CMS plan is unbuilt. So About content is in the database where no administrator can reach it, and is *also* duplicated in `src/lib/pages/fallback.ts`. See §4.
 4. **`ADR-4` — The `events` table was seeded with the same fabrications.** *(added 2026-08-15, once the database became reachable)* `supabase/seed.sql` had written the four demo events into the live table, and `db-migrate.mjs` re-applied it on every run. Fixing `ADR-1` alone made this **worse**, not better: the rows outlived the fallback and became authentic records with a working Register button. Missed on the first pass because the database was unreachable, so only the fallback path was ever rendered. See §2.6 and §7.1.
-5. **`ADR-5` — Rejecting a registration never releases its slot.** *(added 2026-08-15)* `slots_taken` is claimed on registration but released only on the duplicate path. Rejecting a registration leaves the seat consumed, so the published "N left" figure overstates how full an event is **and** genuine applicants are refused with `FULL` while seats are free. Not yet reachable — no event has open registrations — but live from the first real event onward. See §12.
+5. **`ADR-5` — Rejecting a registration never releases its slot.** *(added 2026-08-15)* `slots_taken` is claimed on registration but released only on the duplicate path. Rejecting a registration leaves the seat consumed, so the published "N left" figure overstates how full an event is **and** genuine applicants are refused with `FULL` while seats are free. Not yet reachable — no event has open registrations — but live from the first real event onward. **Resolved by 0020/0021** after the organization confirmed that a rejection returns the seat. See §12.
 
 ---
 
@@ -382,7 +382,7 @@ Nothing below can be resolved from the repository. **None of it may be guessed.*
 19. Whether the 4 testimonials describe real people who consented.
 
 **Policy** *(added 2026-08-15)*
-20. **Does rejecting a registration return the seat to the pool?** The counting bug in §12 is certain; the intended behaviour is not. "Rejected" may mean the seat should be reoffered, or it may mean the application was declined after the seat was already reallocated. The fix differs accordingly, and choosing for the organization would be inventing a rule. Related: `registration_status` includes a `cancelled` value that nothing in the application ever assigns — confirm whether attendees are meant to be able to cancel.
+20. ~~**Does rejecting a registration return the seat to the pool?**~~ **Answered: yes** — implemented in 0020/0021, see §12. Still open, and separable: `registration_status` includes a `cancelled` value that nothing in the application ever assigns. Confirm whether attendees are meant to be able to cancel; the counter already handles it correctly if that flow is built.
 
 ---
 
@@ -490,9 +490,36 @@ Neither is reachable today, because no event has open registrations. It becomes
 reachable the moment the first real event is published and an administrator rejects
 anyone.
 
-**Not fixed here, because the fix encodes an organizational policy rather than a
-correctness rule.** Whether rejecting a registration returns the seat to the pool is
-the organization's decision — plausibly yes for a rejection, but "rejected" may also
-mean "reviewed and declined, seat already reallocated". The counting bug is certain;
-the intended behaviour is not, and guessing it would be inventing an organizational
-rule, which is the one thing this audit does not do. Added to the confirmation list.
+**RESOLVED — migrations 0020 and 0021.** The policy question (does a rejection return
+the seat?) was put to the organization rather than guessed, and confirmed: **yes, the
+seat goes back into the pool.**
+
+A registration holds a seat when `deleted_at is null and status in ('pending',
+'approved')`, and releases it otherwise. `sync_event_slots()` fires after every
+UPDATE or DELETE on `event_registrations` and moves the counter accordingly.
+
+Three decisions worth recording:
+
+- **A trigger, not a fix to the one admin action.** The bug existed because a single
+  code path forgot the counter. Patching that path would leave the next one free to
+  forget it again. The trigger owns every transition, so a future cancellation flow,
+  bulk tool, or manual SQL correction stays consistent without knowing the rule.
+- **INSERT is deliberately *not* handled by the trigger.** `register_for_event`
+  claims the seat inside its conditional `UPDATE`, and that single atomic statement
+  **is** the capacity gate under concurrency. Moving the claim into an insert trigger
+  would evaluate capacity after the row exists and reintroduce the overbooking race.
+  Re-verified after the change: 200 concurrent attempts against 50 seats still yield
+  exactly 50 claimed, 0 overbooked, 0 duplicates.
+- **Re-claiming a seat fails loudly.** Un-rejecting a registration into a full event
+  raises a readable error rather than tripping the bare `slots_not_overbooked`
+  constraint.
+
+0020 rebuilt the counter from live registrations; 0021 extended that to soft-deleted
+events, which 0020 had skipped. A retired event can be restored — 0019 retired four
+precisely so they could be reviewed — and it would have carried a stale counter back
+into public view. The invariant is now asserted for **every** row in `prove:behaviors`
+(12 assertions), not spot-checked.
+
+Confirmation item 20 is answered. The unused `cancelled` status remains open: nothing
+in the application assigns it, so whether attendees may cancel is still unconfirmed —
+though the trigger already handles it correctly if that flow is ever built.

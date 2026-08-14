@@ -178,8 +178,9 @@ None of the following can be resolved from the repository. **Nothing here was gu
 | `npm run prove:pages` | **22 passed, 0 failed** (2026-08-15, against the live DB) |
 | `npm run prove:rbac` | **19 passed, 0 failed** (2026-08-15) |
 | `npm run prove:uploads` | **14 passed, 0 failed** (2026-08-15) |
-| `npm run prove:behaviors` | **6 passed, 0 failed** (2026-08-15) |
-| Migrations 0017 / 0018 / 0019 | **applied 2026-08-15**, effects verified directly against the database (9/9) |
+| `npm run prove:behaviors` | **12 passed, 0 failed** (2026-08-15 — 6 new, covering slot release and the standing invariant) |
+| `npm run prove:concurrency` | 200 attempts / 50 seats → exactly 50 claimed, 0 overbooked, 0 duplicates (re-run after 0020) |
+| Migrations 0017 – 0021 | **applied 2026-08-15**, effects verified directly against the database |
 | Leaked test rows after the suites | none — the suites clean up after themselves |
 
 **`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar, hero and layout never restate identity that lives in settings, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, that the dashboard counts exactly, and — exercising the schema directly rather than by grep — that settings validation rejects malformed URLs, emails and phone numbers. It was mutation-tested: flipping a fixture gate to `true` correctly fails the suite.
@@ -223,4 +224,4 @@ One correction to that scan: the first pass flagged `/events`, but it was a fals
 5. ~~Add validation to the settings form for email format, phone shape, and URL validity.~~ **Done** — phone shape and absolute-URL checks added; email and social URLs were already validated.
 6. Plan the remaining content domains (chapters, leaders, news, gallery) as a managed slice.
 7. ~~Investigate the Supabase project itself.~~ **Resolved** — the project was never gone. Both failures were name resolution; the host resolves and the project answers normally. The earlier reading of "deleted or paused project" was wrong.
-8. Reconcile `slots_taken` with `event_registrations`. `Zubida Provincial Youth Camp 2026` carried `slots_taken = 1` with zero registration rows. Moot now that the event is retired, but the two can evidently drift, and a wrong "slots left" figure on a real event is published misinformation of exactly the kind this audit is about.
+8. ~~Reconcile `slots_taken` with `event_registrations`.~~ **Done** — and it uncovered a live defect rather than just stale test data. Rejecting a registration never released its seat, so the published "N left" overstated how full an event was *and* `register_for_event` refused genuine applicants with `FULL` while seats were free. Migrations 0020/0021 add a trigger that releases the seat on rejection, cancellation or soft-delete, and rebuild the counter across every event. The overbooking guarantee was re-verified afterwards (200 concurrent attempts, 50 seats, exactly 50 claimed). The invariant is now asserted on every row — `prove:behaviors` is 12 assertions. See audit §12. Remaining: the `cancelled` status is still never assigned by the application.
