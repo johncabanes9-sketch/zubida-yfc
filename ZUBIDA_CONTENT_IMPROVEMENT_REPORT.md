@@ -86,6 +86,9 @@ Per your decision, unverifiable content is hidden behind honest empty states and
 - FAQ developer hedge removed. **(#14)**
 - `EventsBoard` dependency array corrected. **(#18)**
 - `/chapters` header changed from "One province, twenty-six homes" to "One province, many homes". **(#10)**
+- **`supabase/migrations/0018_site_url.sql`** (new) — the canonical site URL moves out of `layout.tsx` into `site_settings`. It drives `metadataBase`, so it governs canonical links and the Open Graph URLs used in every shared link preview; it was the last piece of organization identity that could not be corrected without a deploy. The seeded value is the one already in source, so behaviour is unchanged — and it remains unverified (§6). `layout.tsx` falls back to the constant if a stored value is unparseable, so a bad row cannot break site-wide metadata. **(#5 in §6)**
+- **`src/lib/validation/site.ts`** — added phone-shape validation (digits and normal punctuation only, minimum 7 digits) and absolute-URL validation for the site URL. Email and social URLs were already validated.
+- **`src/components/shared/fake-qr.tsx`** — deleted. Superseded in phase 2 and left orphaned: defined but imported nowhere, while `registration-form.tsx:99` renders the real server-generated QR. It drew a meaningless decorative pattern under `aria-label="Registration QR code"`, so an accidental import would have handed a visitor an unscannable "event pass".
 
 **No official statement was reworded.** Mission, Vision, and Core Values are untouched pending confirmation (§6).
 
@@ -96,6 +99,7 @@ Per your decision, unverifiable content is hidden behind honest empty states and
 | Information | Authoritative source | Consumers |
 |---|---|---|
 | Org name, full name, tagline, description, province | `site_settings` | navbar, footer, hero (title + paragraph), `<head>` metadata |
+| Canonical site URL | `site_settings.site_url` | `metadataBase` — canonical links, OG/share previews |
 | Email, phone, office address | `site_settings` | footer, contact page |
 | Facebook, Instagram | `site_settings` | footer, contact page |
 | Footer headings, closing line | `site_settings` | footer |
@@ -137,7 +141,9 @@ None of the following can be resolved from the repository. **Nothing here was gu
 2. Email `hello@zubidayfc.org` — never verified
 3. Office "YFC Provincial Office, Pagadian City, Zamboanga del Sur" — a description, not an address
 4. Facebook `facebook.com/zubidayfc` and Instagram `instagram.com/zubidayfc` — never verified to be the organization's accounts
-5. Canonical domain `zubidayfc.org`, still hardcoded in `src/app/layout.tsx:29`
+5. Canonical domain `zubidayfc.org` — now editable in `/admin/settings` rather than hardcoded, but the value itself was never verified. It governs canonical links and every shared link preview, so a wrong domain is publicly visible.
+
+> Note on 1–5: validation now rejects a *malformed* phone, email, or URL, but it cannot tell a well-formed placeholder from a real one. `+63 962 000 0000` passes validation and is still wrong — `prove:content` asserts this explicitly so the limitation is not mistaken for coverage.
 
 **Official statements — displayed today, unverified**
 6. Mission statement (verbatim)
@@ -166,10 +172,10 @@ None of the following can be resolved from the repository. **Nothing here was gu
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | no warnings or errors (the pre-existing `events-board` warning was fixed, not suppressed) |
 | `npm run build` | exit 0, 15/15 pages; `/admin/pages` and `/admin/pages/[slug]/edit` present |
-| `npm run prove:content` (new) | **41 passed, 0 failed** |
+| `npm run prove:content` (new) | **54 passed, 0 failed** |
 | `npm run prove:pages` | 10/10 offline assertions pass; DB-backed assertions could not run (see below) |
 
-**`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar and hero never restate identity, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, and that the dashboard counts exactly. It was mutation-tested — flipping a fixture gate to `true` correctly fails the suite.
+**`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar, hero and layout never restate identity that lives in settings, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, that the dashboard counts exactly, and — exercising the schema directly rather than by grep — that settings validation rejects malformed URLs, emails and phone numbers. It was mutation-tested: flipping a fixture gate to `true` correctly fails the suite.
 
 ### Final content inspection (live render, text-extracted)
 
@@ -196,9 +202,10 @@ Scanned `/`, `/about`, `/leaders`, `/chapters`, `/news`, `/gallery` for `picsum.
 
 ## 8. Recommended next steps
 
-1. Run `npm run db:migrate` to apply 0017, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.
+1. Run `npm run db:migrate` to apply **0017 and 0018**, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.
 2. Exercise the `/admin/pages` edit loop against the live database, and confirm a cluster head is redirected away from it.
 3. Confirm or correct the items in §6 — the contact details and official statements first, since they are displayed today.
-4. Move `metadataBase` into `site_settings` as a `site_url` field.
-5. Add validation to the settings form for email format, phone shape, and URL validity (`zod` is already a dependency and `src/lib/validation/site.ts` exists).
+4. ~~Move `metadataBase` into `site_settings` as a `site_url` field.~~ **Done** — migration 0018.
+5. ~~Add validation to the settings form for email format, phone shape, and URL validity.~~ **Done** — phone shape and absolute-URL checks added; email and social URLs were already validated.
 6. Plan the remaining content domains (chapters, leaders, news, gallery) as a managed slice.
+7. Investigate the Supabase project itself. The failure is `tenant/user postgres.vtqtsbbzwrfamkftutpj not found` from the pooler and `ENOTFOUND vtqtsbbzwrfamkftutpj.supabase.co` for the REST host — that reads as a deleted or paused project rather than a transient network fault, and it did not recover across the session.

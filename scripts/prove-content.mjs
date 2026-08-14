@@ -49,6 +49,10 @@ for (const [field, value] of Object.entries({
   check(`site_settings seed matches SITE.${field}`, seedHas(value), value);
 }
 
+// site_url arrived in 0018, not the 0013 seed.
+const m18 = read("supabase/migrations/0018_site_url.sql");
+check("0018 seeds site_url to match SITE.url", m18.includes(SITE.url), SITE.url);
+
 // Chrome must read identity from settings, never restate it. A hardcoded copy
 // silently survives a rename in /admin/settings.
 const navbar = code("src/components/layout/navbar.tsx");
@@ -56,6 +60,21 @@ const hero = code("src/components/home/hero.tsx");
 check("navbar does not hardcode the province", !navbar.includes(SITE.province), SITE.province);
 check("navbar does not hardcode the org name", !navbar.includes(`>${SITE.name}<`), SITE.name);
 check("hero does not hardcode the province", !hero.includes(SITE.province), SITE.province);
+
+// metadataBase drives canonical links and OG image URLs on every page. It must
+// come from settings so a wrong domain is a settings edit, not a redeploy — but
+// the constant is still allowed as the fallback for a malformed stored value.
+const layout = code("src/app/layout.tsx");
+check(
+  "layout reads metadataBase from settings",
+  /metadataBase\(site\.siteUrl\)/.test(layout),
+  null,
+);
+check(
+  "layout does not inline the canonical domain",
+  !new RegExp(`new URL\\(\\s*["']${SITE.url}`).test(layout),
+  SITE.url,
+);
 check(
   "hero does not hardcode the org name",
   !/Welcome to[\s\S]{0,120}Zubida YFC/.test(hero),
@@ -157,6 +176,36 @@ const dashboard = read("src/app/admin/page.tsx");
 check(
   "dashboard stats use exact counts rather than the fetched page length",
   dashboard.includes('count: "exact"') && !/const total = rows\.length/.test(dashboard),
+  null,
+);
+
+// ── 8. Settings validation rejects malformed contact details ───────────────
+const { siteSettingsSchema } = await import("../src/lib/validation/site.ts");
+const validSettings = {
+  name: SITE.name, full_name: SITE.fullName, tagline: SITE.tagline,
+  description: SITE.description, province: SITE.province, site_url: SITE.url,
+  email: SITE.email, phone: SITE.phone, office: SITE.office,
+  facebook_url: SITE.socials.facebook, instagram_url: SITE.socials.instagram,
+  footer_explore_heading: "Explore", footer_reach_heading: "Reach Us",
+  footer_closing_line: "Line",
+};
+const accepts = (patch) => siteSettingsSchema.safeParse({ ...validSettings, ...patch }).success;
+
+check("accepts the current settings", accepts({}), null);
+check("rejects a site URL with no scheme", !accepts({ site_url: "zubidayfc.org" }), null);
+check("rejects a relative site URL", !accepts({ site_url: "/home" }), null);
+check("rejects a malformed email", !accepts({ email: "hello@" }), null);
+check("rejects a social URL that is not a URL", !accepts({ facebook_url: "facebook/zubidayfc" }), null);
+check("allows a blank social URL (hides the icon)", accepts({ facebook_url: "" }), null);
+check("rejects a phone containing words", !accepts({ phone: "call the office" }), null);
+check("rejects a phone with too few digits", !accepts({ phone: "+63 12" }), null);
+check("accepts a normally punctuated phone", accepts({ phone: "+63 (962) 123-4567" }), null);
+
+// Stated plainly: shape validation cannot tell a well-formed placeholder from a
+// real number. `+63 962 000 0000` passes and is still on the confirmation list.
+check(
+  "shape validation alone does not catch a placeholder number",
+  accepts({ phone: "+63 962 000 0000" }),
   null,
 );
 
