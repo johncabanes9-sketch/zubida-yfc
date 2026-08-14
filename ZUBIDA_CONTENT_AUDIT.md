@@ -15,11 +15,12 @@
 
 The project shipped a Phase-1 visual showcase (`src/data/*.ts`) populated with plausible-sounding invented content: leader names, chapter rosters, member counts, a 20-year founding history, testimonials, news articles, and events. Phase 2/3 added a real database, but only **events**, **site settings/navigation**, and **the About page** were ever wired to it. Everything else still renders the Phase-1 fixtures verbatim.
 
-Three consequences, all verified live:
+Four consequences, all verified live:
 
 1. **`ADR-1` — Silent mock fallback.** `getEvents()`, `getSiteSettings()`, and `getPage()` each `catch` any failure and fall back to hardcoded Phase-1 data with no signal to the user or operator. During this audit the Supabase host was unreachable (`ENOTFOUND ... postgres.vtqtsbbzwrfamkftutpj not found`), and the public site served **six fabricated events with fabricated slot counts as if they were live** — including a working-looking "Register" button on an event that does not exist. See §7.
 2. **`ADR-2` — Fabricated statistics.** The homepage stats band publishes four hard numbers (26 / 4,200+ / 58 / 340+) that are not derived from any data source and are internally contradicted by the app's own fixtures. See §5.
 3. **`ADR-3` — The About page is DB-driven but not editable.** Migration `0016` moved About into `pages`/`page_sections`, and `src/app/admin/pages/actions.ts` exists (staged, uncommitted), but **`/admin/pages` has no `page.tsx`** — Task 7 of the page-CMS plan is unbuilt. So About content is in the database where no administrator can reach it, and is *also* duplicated in `src/lib/pages/fallback.ts`. See §4.
+4. **`ADR-4` — The `events` table was seeded with the same fabrications.** *(added 2026-08-15, once the database became reachable)* `supabase/seed.sql` had written the four demo events into the live table, and `db-migrate.mjs` re-applied it on every run. Fixing `ADR-1` alone made this **worse**, not better: the rows outlived the fallback and became authentic records with a working Register button. Missed on the first pass because the database was unreachable, so only the fallback path was ever rendered. See §2.6 and §7.1.
 
 ---
 
@@ -148,6 +149,32 @@ Rendered from `page_sections` (DB) with `src/lib/pages/fallback.ts` mirroring it
 | Slot counts ("418 / 600 slots · 182 left") | mock in fallback path | **FABRICATED** | live counts are real when DB is up |
 | Event cover images | `picsum.photos` in mocks | **FABRICATED** | real events use Storage uploads |
 | Empty state | `events-board.tsx:75` "No events here yet" | ✅ correct | |
+| **The `events` table itself** | `supabase/seed.sql` | **FABRICATED — found later, see below** | RESOLVED by 0019 |
+
+> **Correction (2026-08-15).** The rows above were audited with the database
+> **unreachable**, so `/events` showed the fallback and this section concluded that
+> real event data was VERIFIED whenever the DB was up. That inference was wrong.
+> With the database reachable, the `events` table contained nothing *but* the four
+> demo events, put there by `supabase/seed.sql` — the same invented records as the
+> `src/data/events.ts` mocks, including the picsum covers and the "all 26 chapters"
+> line in the Youth Camp description, plus a leftover `CONCURRENCY TEST` row from
+> `scripts/prove-concurrency.mjs`.
+>
+> Removing the code fallback therefore did not stop them being served; it made them
+> **worse**. As mocks they were visibly placeholders on an outage path. As table rows
+> they are authentic records with a working Register button, and nothing on the page
+> distinguishes them from a real event.
+>
+> `db-migrate.mjs` also applied the seed on *every* run — `applySeed()` sat outside
+> the `if (!seedOnly)` block — so any cleanup would have been undone by the next
+> migration in any environment. Fixed in `e87dc17` (seed emptied, seeding now opt-in),
+> `07ade80` (migration 0019 soft-deletes the rows, guarded on the seed signature),
+> and `4b61842` (11 `prove:content` assertions). Verified after applying: 0 events
+> published, 5 rows retired, 6 registrations preserved, `/events` renders its empty
+> state with the database **up**.
+>
+> The general lesson is recorded in §7: an audit that only exercises the fallback
+> path has not audited the primary path. Both states must be rendered.
 
 ### 2.7 Contact (`/contact`)
 
@@ -277,6 +304,34 @@ The intent (documented in-code as "so the public site always renders") is sound 
 
 An empty `events` table is a legitimate state ("no events scheduled yet"). Treating it as "database is broken, show demo data" converts a correct empty state into fabricated content.
 
+### 7.1 Removing a fallback does not remove the content it was hiding
+
+The fix for the above was to delete the mock fallback so an outage renders an honest
+error. That was necessary and it is done. It was not sufficient, and the way it fell
+short is the most transferable lesson in this audit.
+
+**The same fabricated events existed in two places.** `src/data/events.ts` fed the
+fallback; `supabase/seed.sql` had already written them into the `events` table. The
+audit exercised only the DB-down path, saw the fallback replaced by an honest error,
+and recorded events as clean. With the DB up, the seeded rows were what `/events`
+served all along — and deleting the fallback *promoted* them, because a stand-in
+labelled by an outage is at least distinguishable from a record, while a row is not.
+
+Three rules follow:
+
+1. **Audit both states of every fallback.** Rendering one path proves nothing about
+   the other. Where a loader has a fallback, the primary path is the one carrying
+   real consequence, and it is the easier of the two to leave untested — an
+   unreachable database is a *convenient* state to audit in, which is exactly why it
+   is a trap.
+2. **Fixture data has more than one door into production.** Grepping `src/` finds the
+   TypeScript fixtures. It does not find `seed.sql`, and it does not find rows already
+   committed to a live table by a seed that ran months ago.
+3. **A seed that runs unconditionally is a standing re-injection mechanism.**
+   `db-migrate.mjs` applied `seed.sql` on every invocation, so retiring the rows
+   without emptying the seed would have restored them on the next migration — in
+   every environment, silently, with the cleanup appearing to have worked.
+
 ---
 
 ## 8. Content quality / typography
@@ -334,6 +389,7 @@ Ordered by the stated priority: **accuracy → consistency → source of truth �
 ### P0 — Stop publishing things that are wrong (no organizational facts required)
 1. **Fix the dashboard count bug.** Replace `.limit(200)` + `rows.length` with real `count: "exact", head: true` queries for total/pending/approved. Label them unambiguously.
 2. **Stop serving mock events as real.** Remove the `mockEvents` fallback from `getEvents()`; render the existing "No events here yet" empty state when the table is empty, and surface a real error state when the query fails.
+   - **2a. Retire the seeded rows and close the seed.** *(added 2026-08-15 — see §7.1.)* Step 2 alone is not enough and, on its own, makes the problem worse. The same four events were already in the `events` table via `supabase/seed.sql`, which `db-migrate.mjs` re-applied on every run. Empty the seed, make seeding opt-in behind `--seed`, and soft-delete the existing rows with guards that match the seed signature so an adopted event is never touched.
 3. **Add an empty state to the homepage events preview.**
 4. **Remove or neutralize the fabricated stats band** until real figures are confirmed (§9.13–14).
 5. **Remove the `i.pravatar.cc` faces** from leaders and testimonials — real photographs of uninvolved people published as named ZUBIDA leaders.
@@ -363,13 +419,34 @@ Ordered by the stated priority: **accuracy → consistency → source of truth �
 | About Us | live render of `/about` on `:3111`, full text extracted and compared line-by-line against `0016_page_cms.sql` seed and `src/lib/pages/fallback.ts` |
 | Dashboard | source inspection of `src/app/admin/page.tsx` (auth-gated; count bug confirmed by reading the query) |
 | Homepage | live render, full text extracted |
-| Events | live render of `/events`, fallback path confirmed active (DB unreachable) |
+| Events | live render of `/events` — **twice**. First with the DB unreachable (fallback path). Re-verified 2026-08-15 with the DB **reachable**, which is what exposed the seeded rows in §2.6; now renders the empty state from a genuinely empty table. |
 | Contact | live render + source |
 | Footer / Navigation | live render on every fetched page |
 | Contact information | traced to `site_settings` in all three display locations — no conflicts |
 | Social links | traced to `site_settings`; **not** reachability-tested (would require confirming the accounts are the organization's) |
 | Images | full inventory by `grep` across `src/` |
 | Statistics | traced to `src/data/stats.ts` and cross-checked against `chapters.ts`, `leaders.ts`, `events.ts` |
-| Database state | **not verifiable** — Supabase host unreachable (`ENOTFOUND ... postgres.vtqtsbbzwrfamkftutpj`). Row counts could not be read. |
+| Database state | **Verified 2026-08-15.** The earlier `ENOTFOUND` proved to be DNS, not a deleted project — the host resolved again and the REST endpoint answered 401 (reachable, unauthenticated). Migrations 0017–0019 applied; table contents read directly and compared against what renders. |
 
-**Limitations of this audit.** The live database could not be reached, so I could not compare displayed values against real table contents; findings about DB-backed content are based on the code paths and on the fallback behavior observed. No content was modified.
+**Limitations of this audit.**
+
+The original pass could not reach the live database, so displayed values could not be
+compared against real table contents; findings about DB-backed content rested on the
+code paths and the observed fallback behavior. **That limitation produced a wrong
+finding** — see the correction in §2.6. Auditing only the DB-down state made the
+`events` table look clean when it held nothing but fabricated rows.
+
+As of 2026-08-15 the database has been read directly and all five proof suites run
+against it (126 assertions: `pages` 22, `rbac` 19, `uploads` 14, `behaviors` 6,
+`content` 65). Content was modified from this point on — migrations 0017, 0018 and
+0019 — where the original pass modified nothing.
+
+Two items remain unverified because they need credentials rather than access:
+
+- The `/admin/pages` editor has not been exercised against a live database by a
+  signed-in provincial admin (edit, reorder, hide/show, image upload and reap,
+  remove image, SEO edit).
+- The cluster-head redirect away from `/admin/pages` is confirmed only statically —
+  both routes and all nine server actions call `requirePYH`, and the nav tab is
+  `pyhOnly` — not by signing in as a cluster head. The `admins` table holds 1 row,
+  so there may be no cluster-head account to test with yet.

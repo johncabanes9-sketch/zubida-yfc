@@ -1,6 +1,6 @@
 # ZUBIDA Content Improvement Report
 
-**Date:** 2026-08-14
+**Date:** 2026-08-14 · **Updated:** 2026-08-15 (database reachable; migrations applied; §7 revised after a wrong finding was corrected)
 **Branch:** `phase3b-page-cms`
 **Companion document:** [ZUBIDA_CONTENT_AUDIT.md](./ZUBIDA_CONTENT_AUDIT.md) — the full inventory and evidence.
 
@@ -9,6 +9,8 @@
 ## Summary
 
 The audit found that most organizational "facts" on the public site came from Phase-1 demo fixtures, not from Zubida YFC: invented leaders with stock-photo faces, invented chapters and member counts, invented news stories, a fabricated 20-year founding history, and four homepage statistics contradicted by the app's own data. A database outage additionally caused six fabricated events to be served silently as real, complete with slot counts and a working Register button.
+
+That last finding turned out to run deeper than the outage. Once the database became reachable it held **no real events at all** — only the same four fabrications, written there by `supabase/seed.sql` and re-applied on every `db:migrate`. Removing the code fallback had not fixed `/events`; it had promoted placeholders into records. Both the rows and the mechanism that restores them are now closed, and the reasoning is preserved in the audit at §7.1 rather than tidied away.
 
 **No organizational facts were invented, and none were guessed.** Unverifiable content was withheld behind honest empty states, statistics were rewired to real data, and the About page was made editable by administrators. Everything that cannot be resolved from the repository is listed in §6 for confirmation.
 
@@ -172,8 +174,13 @@ None of the following can be resolved from the repository. **Nothing here was gu
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | no warnings or errors (the pre-existing `events-board` warning was fixed, not suppressed) |
 | `npm run build` | exit 0, 15/15 pages; `/admin/pages` and `/admin/pages/[slug]/edit` present |
-| `npm run prove:content` (new) | **54 passed, 0 failed** |
-| `npm run prove:pages` | 10/10 offline assertions pass; DB-backed assertions could not run (see below) |
+| `npm run prove:content` (new) | **65 passed, 0 failed** |
+| `npm run prove:pages` | **22 passed, 0 failed** (2026-08-15, against the live DB) |
+| `npm run prove:rbac` | **19 passed, 0 failed** (2026-08-15) |
+| `npm run prove:uploads` | **14 passed, 0 failed** (2026-08-15) |
+| `npm run prove:behaviors` | **6 passed, 0 failed** (2026-08-15) |
+| Migrations 0017 / 0018 / 0019 | **applied 2026-08-15**, effects verified directly against the database (9/9) |
+| Leaked test rows after the suites | none — the suites clean up after themselves |
 
 **`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar, hero and layout never restate identity that lives in settings, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, that the dashboard counts exactly, and — exercising the schema directly rather than by grep — that settings validation rejects malformed URLs, emails and phone numbers. It was mutation-tested: flipping a fixture gate to `true` correctly fails the suite.
 
@@ -185,16 +192,23 @@ Scanned `/`, `/about`, `/leaders`, `/chapters`, `/news`, `/gallery` for `picsum.
 - About — hero, who-we-are, mission, vision, core values; history section absent; no chapter count; no stock image
 - Leaders / Chapters / News / Gallery — honest unpublished notices
 - Events — "The event schedule can't be loaded right now" instead of six fabricated events
+
+**Re-inspected 2026-08-15 with the database UP** — the state the original inspection could not reach. All eight public pages scan clean for `Camp Abelardo`, `ICON: Ignite`, `Christian Life Seminar — Labangan`, `Household Leaders' Formation`, `CONCURRENCY TEST`, `picsum.photos`, `pravatar.cc`, `twenty-six chapters`, `26 chapters`, `4,200`, `The First Spark`, `Two decades`, `Molave Parish Hall`, `St. Isidore Parish`. `/events` renders **"No events here yet"** — the *empty* state, from a genuinely empty table, correctly distinguished from the outage state. `/about` shows three sections with no history timeline, and its `<meta description>` is 0017's corrected text, confirming the migration is live in rendered output. `/admin/pages` returns **307 → /admin/login** when unauthenticated.
+
+One correction to that scan: the first pass flagged `/events`, but it was a false positive — the pattern matched the hero subtitle "Provincial camps, conferences, Christian Life Seminars, and chapter missions", a generic description of programme types rather than the fabricated listing. Narrowed to the full event title; zero real hits.
 - Footer / navigation — single-sourced, consistent across every page
 - Contact information — one value each, no conflicts between footer, contact page, and settings
 - Statistics — derived; band omitted when nothing is countable
 
 ### Limitations — stated plainly
 
-1. **The Supabase database was unreachable for the entire session** (`ENOTFOUND vtqtsbbzwrfamkftutpj.supabase.co`). Consequences:
-   - Migration **0017 has not been applied**. Run `npm run db:migrate` when the database is reachable. Until then the DB still holds the fabricated timeline and chapter count; the *rendered* site is correct only because the fallback path is active.
-   - `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors` could not complete their DB-backed assertions.
-   - The `/admin/pages` editor was verified by typecheck, lint, and build, and its routes are present — but it has **not been exercised against a live database**. The end-to-end admin edit loop (Task 8 §3 of the plan) remains to be run.
+1. ~~**The Supabase database was unreachable for the entire session.**~~ **Resolved 2026-08-15.** The `ENOTFOUND` was DNS, not a deleted project — the host resolved again and the REST endpoint answered 401 (reachable, unauthenticated). Migrations 0017–0019 are applied and all five proof suites pass against the live database.
+
+   **This limitation produced one wrong finding, which is worth stating rather than quietly fixing.** Because only the DB-down path could be rendered, the report concluded that removing the mock-event fallback had made `/events` accurate. It had not. `supabase/seed.sql` had already written the same four fabricated events into the `events` table, and `db-migrate.mjs` re-applied the seed on *every* run. Removing the fallback made this worse: the rows outlived it and became authentic records with a working Register button, indistinguishable from a real event. Fixed by emptying the seed, making seeding opt-in behind `--seed`, and adding migration 0019 to soft-delete the rows under guards that match the seed signature. The general rule — audit both sides of every fallback — is recorded in the audit at §7.1.
+
+   Still outstanding, now for want of credentials rather than access:
+   - The `/admin/pages` editor has **not been exercised against a live database** by a signed-in provincial admin. The end-to-end edit loop (Task 8 §3 of the plan) remains to be run.
+   - The cluster-head redirect is confirmed only statically — both routes and all nine server actions call `requirePYH`, and the nav tab is `pyhOnly` — not by signing in as a cluster head. The `admins` table holds 1 row, so there may be no cluster-head account to test with yet.
 2. Social URLs were not reachability-tested; confirming an account belongs to the organization is not something I can determine.
 3. Chapters, leaders, news, gallery, testimonials, and the FAQ remain hardcoded fixtures behind the publication gate. Bringing them under management is genuinely new scope and should be planned as its own slice, consistent with the existing `pages`/`page_sections` architecture rather than a second CMS.
 
@@ -202,10 +216,11 @@ Scanned `/`, `/about`, `/leaders`, `/chapters`, `/news`, `/gallery` for `picsum.
 
 ## 8. Recommended next steps
 
-1. Run `npm run db:migrate` to apply **0017 and 0018**, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.
-2. Exercise the `/admin/pages` edit loop against the live database, and confirm a cluster head is redirected away from it.
-3. Confirm or correct the items in §6 — the contact details and official statements first, since they are displayed today.
+1. ~~Run `npm run db:migrate` to apply **0017 and 0018**, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.~~ **Done** — 0017, 0018 and 0019 applied; all four suites pass, plus `prove:content`. 126 assertions total.
+2. Exercise the `/admin/pages` edit loop against the live database, and confirm a cluster head is redirected away from it. **Still open — needs a signed-in provincial admin, and a cluster-head account to test the negative case.**
+3. Confirm or correct the items in §6 — the contact details and official statements first, since they are displayed today. **This is now the main thing standing between this branch and accurate public content.**
 4. ~~Move `metadataBase` into `site_settings` as a `site_url` field.~~ **Done** — migration 0018.
 5. ~~Add validation to the settings form for email format, phone shape, and URL validity.~~ **Done** — phone shape and absolute-URL checks added; email and social URLs were already validated.
 6. Plan the remaining content domains (chapters, leaders, news, gallery) as a managed slice.
-7. Investigate the Supabase project itself. The failure is `tenant/user postgres.vtqtsbbzwrfamkftutpj not found` from the pooler and `ENOTFOUND vtqtsbbzwrfamkftutpj.supabase.co` for the REST host — that reads as a deleted or paused project rather than a transient network fault, and it did not recover across the session.
+7. ~~Investigate the Supabase project itself.~~ **Resolved** — the project was never gone. Both failures were name resolution; the host resolves and the project answers normally. The earlier reading of "deleted or paused project" was wrong.
+8. Reconcile `slots_taken` with `event_registrations`. `Zubida Provincial Youth Camp 2026` carried `slots_taken = 1` with zero registration rows. Moot now that the event is retired, but the two can evidently drift, and a wrong "slots left" figure on a real event is published misinformation of exactly the kind this audit is about.
