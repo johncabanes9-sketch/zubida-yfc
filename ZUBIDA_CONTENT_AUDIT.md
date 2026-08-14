@@ -15,12 +15,13 @@
 
 The project shipped a Phase-1 visual showcase (`src/data/*.ts`) populated with plausible-sounding invented content: leader names, chapter rosters, member counts, a 20-year founding history, testimonials, news articles, and events. Phase 2/3 added a real database, but only **events**, **site settings/navigation**, and **the About page** were ever wired to it. Everything else still renders the Phase-1 fixtures verbatim.
 
-Four consequences, all verified live:
+Five consequences, all verified live:
 
 1. **`ADR-1` — Silent mock fallback.** `getEvents()`, `getSiteSettings()`, and `getPage()` each `catch` any failure and fall back to hardcoded Phase-1 data with no signal to the user or operator. During this audit the Supabase host was unreachable (`ENOTFOUND ... postgres.vtqtsbbzwrfamkftutpj not found`), and the public site served **six fabricated events with fabricated slot counts as if they were live** — including a working-looking "Register" button on an event that does not exist. See §7.
 2. **`ADR-2` — Fabricated statistics.** The homepage stats band publishes four hard numbers (26 / 4,200+ / 58 / 340+) that are not derived from any data source and are internally contradicted by the app's own fixtures. See §5.
 3. **`ADR-3` — The About page is DB-driven but not editable.** Migration `0016` moved About into `pages`/`page_sections`, and `src/app/admin/pages/actions.ts` exists (staged, uncommitted), but **`/admin/pages` has no `page.tsx`** — Task 7 of the page-CMS plan is unbuilt. So About content is in the database where no administrator can reach it, and is *also* duplicated in `src/lib/pages/fallback.ts`. See §4.
 4. **`ADR-4` — The `events` table was seeded with the same fabrications.** *(added 2026-08-15, once the database became reachable)* `supabase/seed.sql` had written the four demo events into the live table, and `db-migrate.mjs` re-applied it on every run. Fixing `ADR-1` alone made this **worse**, not better: the rows outlived the fallback and became authentic records with a working Register button. Missed on the first pass because the database was unreachable, so only the fallback path was ever rendered. See §2.6 and §7.1.
+5. **`ADR-5` — Rejecting a registration never releases its slot.** *(added 2026-08-15)* `slots_taken` is claimed on registration but released only on the duplicate path. Rejecting a registration leaves the seat consumed, so the published "N left" figure overstates how full an event is **and** genuine applicants are refused with `FULL` while seats are free. Not yet reachable — no event has open registrations — but live from the first real event onward. See §12.
 
 ---
 
@@ -380,6 +381,9 @@ Nothing below can be resolved from the repository. **None of it may be guessed.*
 18. Real photographs for hero, About, chapters, gallery, leaders, testimonials.
 19. Whether the 4 testimonials describe real people who consented.
 
+**Policy** *(added 2026-08-15)*
+20. **Does rejecting a registration return the seat to the pool?** The counting bug in §12 is certain; the intended behaviour is not. "Rejected" may mean the seat should be reoffered, or it may mean the application was declined after the seat was already reallocated. The fix differs accordingly, and choosing for the organization would be inventing a rule. Related: `registration_status` includes a `cancelled` value that nothing in the application ever assigns — confirm whether attendees are meant to be able to cancel.
+
 ---
 
 ## 10. Prioritized remediation plan
@@ -450,3 +454,45 @@ Two items remain unverified because they need credentials rather than access:
   both routes and all nine server actions call `requirePYH`, and the nav tab is
   `pyhOnly` — not by signing in as a cluster head. The `admins` table holds 1 row,
   so there may be no cluster-head account to test with yet.
+
+---
+
+## 12. `ADR-5` — Rejecting a registration never releases its slot
+
+*Found 2026-08-15, following up the `slots_taken = 1` / zero-registrations drift on
+the retired Youth Camp row.*
+
+**The counter is claimed but only ever released on one path.** `register_for_event`
+(`0004_functions.sql:31`) increments `slots_taken` atomically before inserting, which
+is the correct way to claim capacity under concurrency, and the suite proves it holds
+under load (`prove:concurrency`, `prove:behaviors`). The only decrement in the entire
+schema is at `0004_functions.sql:73`, inside `exception when unique_violation` — the
+duplicate-registration path.
+
+Meanwhile `updateRegistrationStatus` (`src/app/admin/actions.ts:13`) sets a
+registration to `approved` or `rejected` and touches nothing else. There is no
+trigger on `event_registrations`. The `cancelled` enum value
+(`0002_registrations.sql:3`) is never assigned anywhere in the application.
+
+So a rejected registration holds its slot forever. Two consequences, both of them
+squarely the subject of this audit:
+
+1. **The published figure overstates demand.** `/events` shows
+   `{slotsTaken}/{slotsTotal} slots` and "N left" (`event-card.tsx:69`), and
+   `LiveSlots` keeps it updated in real time. After an admin rejects registrations,
+   that number is wrong in the direction that makes the event look fuller than it is.
+2. **Real registrations are refused.** `register_for_event` gates on
+   `slots_taken < slots_total`. An event whose rejections have consumed the remaining
+   capacity returns `FULL` to genuine applicants while seats are actually free. This
+   is worse than a wrong figure — it silently turns people away.
+
+Neither is reachable today, because no event has open registrations. It becomes
+reachable the moment the first real event is published and an administrator rejects
+anyone.
+
+**Not fixed here, because the fix encodes an organizational policy rather than a
+correctness rule.** Whether rejecting a registration returns the seat to the pool is
+the organization's decision — plausibly yes for a rejection, but "rejected" may also
+mean "reviewed and declined, seat already reallocated". The counting bug is certain;
+the intended behaviour is not, and guessing it would be inventing an organizational
+rule, which is the one thing this audit does not do. Added to the confirmation list.
