@@ -493,15 +493,43 @@ footer row unconditionally, linking the raw settings value, disabling the blank
 filter, restoring `required` on the schema (email and phone separately) and on the
 form input, and dropping 0022's guard.
 
-Two items remain unverified because they need credentials rather than access:
+~~Two items remain unverified because they need credentials rather than access.~~
+**Both were closed on 2026-08-15**, driven through a real browser against the live
+database.
 
-- The `/admin/pages` editor has not been exercised against a live database by a
-  signed-in provincial admin (edit, reorder, hide/show, image upload and reap,
-  remove image, SEO edit).
-- The cluster-head redirect away from `/admin/pages` is confirmed only statically —
-  both routes and all nine server actions call `requirePYH`, and the nav tab is
-  `pyhOnly` — not by signing in as a cluster head. The `admins` table holds 1 row,
-  so there may be no cluster-head account to test with yet.
+- **The `/admin/pages` editor — 31 assertions, all passing.** Signed in as a
+  provincial youth head: an unauthenticated visit redirects to the login page; the
+  Pages tab appears; the editor loads; an SEO edit reaches the public `<title>`; a
+  hero-title edit persists to the database *and* appears on `/about`; hiding a
+  section removes it from `/about` and showing it brings it back; a reorder swaps
+  two rows; an upload records the object and stores it; a **second upload reaps the
+  first object** and points the section at the new one; removing the image clears
+  the content and deletes the object, leaving storage exactly as it started.
+- **The cluster-head redirect — 5 assertions, all passing.** A signed-in cluster
+  head never sees the Pages tab, is redirected from `/admin/pages` *and* from
+  `/admin/pages/[slug]/edit` to `/admin?error=forbidden`, and never receives the
+  editor form. This is the first *negative* RBAC test on this surface; everything
+  before it was static confirmation that `requirePYH` is called.
+
+Two notes on how that was done, because both bear on trusting the result:
+
+1. **No existing account was modified.** The default password in
+   `scripts/setup-admin.mjs` no longer opens `admin@zubidayfc.org`, and resetting
+   the only real admin's password to run a test is not an acceptable trade. Two
+   throwaway accounts were created instead (one per role), used, then deleted —
+   deletion required clearing their `audit_log` rows first, which is why the first
+   attempt reported an empty error. The `admins` table and the auth user list were
+   both re-read afterwards: one row, one user, exactly as before.
+2. **The About page was snapshotted and restored.** The walkthrough writes to live
+   public content, so `pages`, `page_sections` and the storage listing were captured
+   first and compared field by field afterwards — reported IDENTICAL. All five proof
+   suites were re-run after the restore and remain at 156.
+
+The first run of the storage assertions is worth recording: `storage.list("pages")`
+returns the *folder* entry `about`, not the objects inside it, so three "the object
+was reaped" assertions were passing against a list that never contained the object.
+Two sibling assertions failed and exposed it. Same vacuous-pass family as §7.1 —
+an absence assertion is only as good as the collection it searches.
 
 ---
 
