@@ -1,6 +1,6 @@
 # ZUBIDA Content Improvement Report
 
-**Date:** 2026-08-14 · **Updated:** 2026-08-15 (database reachable; migrations applied; §7 revised after a wrong finding was corrected)
+**Date:** 2026-08-14 · **Updated:** 2026-08-15 (database reachable; migrations 0017–0022 applied; §7 revised after a wrong finding was corrected; placeholder contact details withheld)
 **Branch:** `phase3b-page-cms`
 **Companion document:** [ZUBIDA_CONTENT_AUDIT.md](./ZUBIDA_CONTENT_AUDIT.md) — the full inventory and evidence.
 
@@ -11,6 +11,8 @@
 The audit found that most organizational "facts" on the public site came from Phase-1 demo fixtures, not from Zubida YFC: invented leaders with stock-photo faces, invented chapters and member counts, invented news stories, a fabricated 20-year founding history, and four homepage statistics contradicted by the app's own data. A database outage additionally caused six fabricated events to be served silently as real, complete with slot counts and a working Register button.
 
 That last finding turned out to run deeper than the outage. Once the database became reachable it held **no real events at all** — only the same four fabrications, written there by `supabase/seed.sql` and re-applied on every `db:migrate`. Removing the code fallback had not fixed `/events`; it had promoted placeholders into records. Both the rows and the mechanism that restores them are now closed, and the reasoning is preserved in the audit at §7.1 rather than tidied away.
+
+A second finding followed the same shape. The placeholder phone number and email address had been recorded as fabricated since the first pass, yet were still being served on every page — because unlike every other invention in this codebase they are *well-formed*, so no validator, scan, or empty state ever had cause to stop them. They are now withheld rather than validated, for the reason set out in the audit at §7.2: any check strict enough to reject `+63 962 000 0000` would also reject the real number.
 
 **No organizational facts were invented, and none were guessed.** Unverifiable content was withheld behind honest empty states, statistics were rewired to real data, and the About page was made editable by administrators. Everything that cannot be resolved from the repository is listed in §6 for confirmation.
 
@@ -79,6 +81,7 @@ Per your decision, unverifiable content is hidden behind honest empty states and
 - **`supabase/migrations/0017_about_unverified_content.sql`** (new) — hides the About history timeline (`visible = false`, content preserved for correction), removes the picsum image, drops the "twenty-six chapters" clause from the prose, and fixes the SEO description. Every statement is guarded so it only touches still-seeded content and never overwrites an administrator's edit. **(#4, #10, #17, #19)**
 - **`src/lib/pages/fallback.ts`** — mirrors 0017 exactly, so a DB outage cannot resurrect the hidden history. The timeline copy is retained as `UNVERIFIED_ABOUT_HISTORY` for an administrator to correct. **(#4)**
 - **Hero and about teaser** — stock photography withheld; the hero keeps its branded gradient treatment and the teaser runs single-column. **(#19)**
+- **`src/lib/content/contact.ts`** (new) + **`0022_withhold_placeholder_contact.sql`** (new) — the placeholder phone and email are withheld the same way. One shared filter decides what is publishable, so the footer and `/contact` cannot diverge and a future surface cannot forget the rule; a withheld channel is omitted entirely rather than rendered as an empty label or a dead `mailto:`. `SITE.email` / `SITE.phone` are blank so the DB-outage fallback withholds too, the schema and the settings form accept a blank so a PYH admin can clear or restore the field, and 0022 blanks the stored values guarded on the exact stand-in. **(#1, #2)**
 - **`src/lib/pages/content-schemas.ts`, `text-image-section.tsx`, `registry.tsx`** — a `text-image` section's image is now optional and new sections start text-only, so no stand-in photo is ever seeded. **(#19)**
 
 ### Consistency and quality
@@ -139,13 +142,15 @@ Already editable before this pass, unchanged: site settings, navigation, events,
 None of the following can be resolved from the repository. **Nothing here was guessed.**
 
 **Currently placeholder-shaped — should be treated as wrong until confirmed**
-1. Phone `+63 962 000 0000` — a placeholder pattern
-2. Email `hello@zubidayfc.org` — never verified
+1. Phone — **no longer published.** `+63 962 000 0000` was a placeholder pattern; `site_settings.phone` is now blank and the site renders no phone number at all. The real number is still needed.
+2. Email — **no longer published.** `hello@zubidayfc.org` was never verified; `site_settings.email` is now blank. The real address is still needed.
 3. Office "YFC Provincial Office, Pagadian City, Zamboanga del Sur" — a description, not an address
 4. Facebook `facebook.com/zubidayfc` and Instagram `instagram.com/zubidayfc` — never verified to be the organization's accounts
 5. Canonical domain `zubidayfc.org` — now editable in `/admin/settings` rather than hardcoded, but the value itself was never verified. It governs canonical links and every shared link preview, so a wrong domain is publicly visible.
 
 > Note on 1–5: validation now rejects a *malformed* phone, email, or URL, but it cannot tell a well-formed placeholder from a real one. `+63 962 000 0000` passes validation and is still wrong — `prove:content` asserts this explicitly so the limitation is not mistaken for coverage.
+>
+> **Update (2026-08-15).** For 1 and 2 that limitation is no longer load-bearing, because the values are no longer published. Since no detector can safely reject a well-formed number — one strict enough would also reject the real number an administrator had just typed — the answer was to withhold instead of to validate: blank the stored value, blank the constants behind the DB-outage fallback, make blank legal in both the schema and the settings form, and omit the element entirely rather than render an empty label. Items 3–5 are unchanged and still published; the office address and canonical domain in particular are visible today. See audit §7.2.
 
 **Official statements — displayed today, unverified**
 6. Mission statement (verbatim)
@@ -174,20 +179,22 @@ None of the following can be resolved from the repository. **Nothing here was gu
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | no warnings or errors (the pre-existing `events-board` warning was fixed, not suppressed) |
 | `npm run build` | exit 0, 15/15 pages; `/admin/pages` and `/admin/pages/[slug]/edit` present |
-| `npm run prove:content` (new) | **65 passed, 0 failed** |
+| `npm run prove:content` (new) | **89 passed, 0 failed** (2026-08-15 — 24 new, covering the withheld contact details) |
 | `npm run prove:pages` | **22 passed, 0 failed** (2026-08-15, against the live DB) |
 | `npm run prove:rbac` | **19 passed, 0 failed** (2026-08-15) |
 | `npm run prove:uploads` | **14 passed, 0 failed** (2026-08-15) |
 | `npm run prove:behaviors` | **12 passed, 0 failed** (2026-08-15 — 6 new, covering slot release and the standing invariant) |
 | `npm run prove:concurrency` | 200 attempts / 50 seats → exactly 50 claimed, 0 overbooked, 0 duplicates (re-run after 0020) |
-| Migrations 0017 – 0021 | **applied 2026-08-15**, effects verified directly against the database |
+| Migrations 0017 – 0022 | **applied 2026-08-15**, effects verified directly against the database |
 | Leaked test rows after the suites | none — the suites clean up after themselves |
 
-**`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar, hero and layout never restate identity that lives in settings, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, that the dashboard counts exactly, and — exercising the schema directly rather than by grep — that settings validation rejects malformed URLs, emails and phone numbers. It was mutation-tested: flipping a fixture gate to `true` correctly fails the suite.
+**`prove:content`** (`scripts/prove-content.mjs`) is the automated consistency test asked for: it asserts the `site_settings` seed matches `constants.ts` field by field, that navbar, hero and layout never restate identity that lives in settings, that the DB-outage fallback contains no hidden timeline / chapter count / placeholder imagery, that migration 0017 withholds the same things, that all four fixture pages are gated, that statistics are derived rather than asserted, that `getEvents` no longer falls back to mocks, that the dashboard counts exactly, and — exercising the schema directly rather than by grep — that settings validation rejects malformed URLs, emails and phone numbers — while accepting a blank one, since withholding has to be expressible before it can be chosen. It was mutation-tested: flipping a fixture gate to `true` correctly fails the suite, and each of the eight production changes behind the withheld contact details was reverted in turn, each caught by its intended assertion.
 
 ### Final content inspection (live render, text-extracted)
 
 Scanned `/`, `/about`, `/leaders`, `/chapters`, `/news`, `/gallery` for `picsum.photos`, `pravatar.cc`, `2003`, `twenty-six`, `26 chapters`, `4,200`, `Rev. Fr.`, `Camp Abelardo` — **zero occurrences on every page.**
+
+Re-scanned 2026-08-15 after 0022, all 8 public pages, for `+63 962 000 0000`, `hello@zubidayfc.org`, and the empty-link forms `mailto:""` / `tel:""` — **zero occurrences on every page.** Positively confirmed the pages still render rather than merely omitting: `/contact` shows a single "Province Office" card, and the footer's "Reach Us" block shows the office line alone.
 
 - Homepage — identity from settings, no fabricated stats, no invented news/photos/testimonials, honest events state
 - About — hero, who-we-are, mission, vision, core values; history section absent; no chapter count; no stock image
@@ -217,11 +224,12 @@ One correction to that scan: the first pass flagged `/events`, but it was a fals
 
 ## 8. Recommended next steps
 
-1. ~~Run `npm run db:migrate` to apply **0017 and 0018**, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.~~ **Done** — 0017, 0018 and 0019 applied; all four suites pass, plus `prove:content`. 126 assertions total.
+1. ~~Run `npm run db:migrate` to apply **0017 and 0018**, then re-run `prove:pages`, `prove:rbac`, `prove:uploads`, `prove:behaviors`.~~ **Done** — 0017 through 0022 applied; all four suites pass, plus `prove:content`. 156 assertions total.
 2. Exercise the `/admin/pages` edit loop against the live database, and confirm a cluster head is redirected away from it. **Still open — needs a signed-in provincial admin, and a cluster-head account to test the negative case.**
-3. Confirm or correct the items in §6 — the contact details and official statements first, since they are displayed today. **This is now the main thing standing between this branch and accurate public content.**
+3. Confirm or correct the items in §6 — the official statements, office address and canonical domain first, since those are still displayed today. **This is now the main thing standing between this branch and accurate public content.** The phone and email are no longer part of it: they are withheld rather than wrong, and entering them in `/admin/settings` publishes them without a redeploy.
 4. ~~Move `metadataBase` into `site_settings` as a `site_url` field.~~ **Done** — migration 0018.
 5. ~~Add validation to the settings form for email format, phone shape, and URL validity.~~ **Done** — phone shape and absolute-URL checks added; email and social URLs were already validated.
 6. Plan the remaining content domains (chapters, leaders, news, gallery) as a managed slice.
 7. ~~Investigate the Supabase project itself.~~ **Resolved** — the project was never gone. Both failures were name resolution; the host resolves and the project answers normally. The earlier reading of "deleted or paused project" was wrong.
 8. ~~Reconcile `slots_taken` with `event_registrations`.~~ **Done** — and it uncovered a live defect rather than just stale test data. Rejecting a registration never released its seat, so the published "N left" overstated how full an event was *and* `register_for_event` refused genuine applicants with `FULL` while seats were free. Migrations 0020/0021 add a trigger that releases the seat on rejection, cancellation or soft-delete, and rebuild the counter across every event. The overbooking guarantee was re-verified afterwards (200 concurrent attempts, 50 seats, exactly 50 claimed). The invariant is now asserted on every row — `prove:behaviors` is 12 assertions. See audit §12. Remaining: the `cancelled` status is still never assigned by the application.
+9. ~~Withhold the placeholder contact details.~~ **Done** — `+63 962 000 0000` and `hello@zubidayfc.org` were the last fabricated values still being published, and the audit had them on record as fabricated the whole time. Migration 0022 blanks them under guards matching the exact stand-in; `SITE.email` / `SITE.phone` are blank so the outage fallback withholds too; a shared `publishedContact()` filter omits a withheld channel from the footer and `/contact` entirely; and the schema and settings form now accept a blank, because withholding has to be expressible before it can be chosen. Re-scanned all 8 public pages: zero occurrences, no empty `mailto:` links. See audit §7.2.

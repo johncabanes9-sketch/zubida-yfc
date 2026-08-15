@@ -65,8 +65,8 @@ Legend — **Accurate?**: `VERIFIED` = traceable to an authoritative project sou
 | Footer | Description | `site_settings.description` | UNVERIFIED | fallback | ✅ | `site_settings` |
 | Footer | Tagline "One Province. One Mission. One Christ." | `site_settings.tagline` | UNVERIFIED | fallback | ✅ | `site_settings` |
 | Footer | Office "YFC Provincial Office, Pagadian City, Zamboanga del Sur" | `site_settings.office` | **UNVERIFIED — no street address** | fallback | ✅ | `site_settings` |
-| Footer | Email `hello@zubidayfc.org` | `site_settings.email` | **UNVERIFIED — likely placeholder** | fallback | ✅ | `site_settings` |
-| Footer | Phone `+63 962 000 0000` | `site_settings.phone` | **FABRICATED — `000 0000` is a placeholder pattern** | fallback | ✅ | `site_settings` |
+| Footer | Email — was `hello@zubidayfc.org` | `site_settings.email` | **WITHHELD (0022)** — was UNVERIFIED, likely placeholder | fallback also blank | ✅ | `site_settings` |
+| Footer | Phone — was `+63 962 000 0000` | `site_settings.phone` | **WITHHELD (0022)** — was FABRICATED, `000 0000` is a placeholder pattern | fallback also blank | ✅ | `site_settings` |
 | Footer | Facebook `https://facebook.com/zubidayfc` | `site_settings.facebook_url` | **UNVERIFIED — never validated** | fallback | ✅ | `site_settings` |
 | Footer | Instagram `https://instagram.com/zubidayfc` | `site_settings.instagram_url` | **UNVERIFIED — never validated** | fallback | ✅ | `site_settings` |
 | Footer | Copyright `© {year} {fullName}` | computed | VERIFIED | — | n/a | fine |
@@ -333,6 +333,46 @@ Three rules follow:
    without emptying the seed would have restored them on the next migration — in
    every environment, silently, with the cleanup appearing to have worked.
 
+### 7.2 A well-formed placeholder outlives every check that looks at shape
+
+`hello@zubidayfc.org` and `+63 962 000 0000` were the last fabricated values still
+being *published*. Everything else unverified in this audit was withheld — the
+history timeline hidden, the chapter count dropped, the stock photograph removed,
+the demo events retired. These two survived all of it, and the reason is worth
+stating plainly: **they are the only fabricated content in the codebase that is
+well-formed.**
+
+Each layer that could have caught them was, by construction, looking at the wrong
+thing:
+
+- **Validation** parses shape. `+63 962 000 0000` is a valid phone; `hello@` is not.
+  `prove:content` has always asserted this limitation out loud — "shape validation
+  alone does not catch a placeholder number" is a passing assertion, deliberately
+  written so the coverage is never mistaken for protection.
+- **The fabricated-string scan** looks for known invented text. Contact details were
+  on the confirmation list, not the scan list, so eight clean page scans said nothing
+  about them.
+- **The audit's own table** classified them correctly on day one — row 69 said
+  *FABRICATED*. Being recorded is not being fixed, and a finding parked in a
+  confirmation list is a finding that ships.
+
+The fix is not a better detector. A heuristic strong enough to reject
+`+63 962 000 0000` would also reject real numbers an administrator had just typed,
+and would fail closed against the very people it is meant to serve. The fix is
+**withholding**: blank the value, and render nothing where it used to be.
+
+Two rules follow:
+
+4. **Withholding must be expressible before it can be chosen.** `email` and `phone`
+   were `required` in both the Zod schema and the HTML form. The only way to stop
+   publishing a placeholder was to invent a replacement for it — the tooling made
+   fabrication the path of least resistance. A field that cannot be cleared is a
+   field that will hold a lie.
+5. **"Recorded in the audit" and "not published" are different states.** This
+   document listed the phone number as fabricated for the entire life of the audit
+   while the site served it to every visitor. Findings need a publication gate, not
+   just a row in a table.
+
 ---
 
 ## 8. Content quality / typography
@@ -356,9 +396,9 @@ Nothing below can be resolved from the repository. **None of it may be guessed.*
 1. Official organization name — short and expanded forms.
 2. Whether the tagline "One Province. One Mission. One Christ." is official.
 
-**Contact — currently placeholder-shaped**
-3. Real email address (`hello@zubidayfc.org` is unverified).
-4. Real phone number (`+63 962 000 0000` is a placeholder).
+**Contact — now withheld rather than published** *(0022, 2026-08-15)*
+3. Real email address. The unverified `hello@zubidayfc.org` is **no longer published** — `site_settings.email` is blank and the site renders no email at all. Still needed; enter it in `/admin/settings` once confirmed.
+4. Real phone number. The placeholder `+63 962 000 0000` is **no longer published** — same treatment. Still needed.
 5. Real office address (currently a description, not an address).
 6. Real Facebook URL; real Instagram URL (or confirmation that no Instagram account exists).
 7. Real public website domain (`zubidayfc.org` is hardcoded in metadata).
@@ -399,6 +439,7 @@ Ordered by the stated priority: **accuracy → consistency → source of truth �
 5. **Remove the `i.pravatar.cc` faces** from leaders and testimonials — real photographs of uninvolved people published as named ZUBIDA leaders.
 6. **Fix the dead `"#"` social links** on leader cards.
 7. **Remove the "rolling out" developer hedge** from the FAQ.
+   - **7a. Withhold the placeholder contact details.** *(added 2026-08-15 — see §7.2.)* `hello@zubidayfc.org` and `+63 962 000 0000` were the last fabricated values still being published. Blank them in `site_settings` (guarded, 0022) and in the constants backing the outage fallback; make blank a legal value in the schema and the settings form so withholding is expressible; and drop the element entirely on every surface rather than rendering an empty label or a dead `mailto:`. Requires no organizational facts — that is the point: the number is not needed to stop publishing the wrong one.
 
 ### P1 — Make the About page actually manageable
 8. **Build `/admin/pages` + `/admin/pages/[slug]/edit`** (Task 7 of the existing plan) and add the "Pages" tab to `AdminShell`. The server actions are already written.
@@ -426,11 +467,11 @@ Ordered by the stated priority: **accuracy → consistency → source of truth �
 | Events | live render of `/events` — **twice**. First with the DB unreachable (fallback path). Re-verified 2026-08-15 with the DB **reachable**, which is what exposed the seeded rows in §2.6; now renders the empty state from a genuinely empty table. |
 | Contact | live render + source |
 | Footer / Navigation | live render on every fetched page |
-| Contact information | traced to `site_settings` in all three display locations — no conflicts |
+| Contact information | traced to `site_settings` in all three display locations — no conflicts. **Re-verified 2026-08-15 after 0022:** the live row reads `email=""`, `phone=""` (office preserved); all 8 public pages re-fetched and scanned — no placeholder value, and no empty `mailto:""` / `tel:""` link. `/contact` renders a single "Province Office" card and the footer's "Reach Us" block renders the office line alone, so the channels are omitted rather than blanked in place. |
 | Social links | traced to `site_settings`; **not** reachability-tested (would require confirming the accounts are the organization's) |
 | Images | full inventory by `grep` across `src/` |
 | Statistics | traced to `src/data/stats.ts` and cross-checked against `chapters.ts`, `leaders.ts`, `events.ts` |
-| Database state | **Verified 2026-08-15.** The earlier `ENOTFOUND` proved to be DNS, not a deleted project — the host resolved again and the REST endpoint answered 401 (reachable, unauthenticated). Migrations 0017–0019 applied; table contents read directly and compared against what renders. |
+| Database state | **Verified 2026-08-15.** The earlier `ENOTFOUND` proved to be DNS, not a deleted project — the host resolved again and the REST endpoint answered 401 (reachable, unauthenticated). Migrations 0017–0022 applied; table contents read directly and compared against what renders. |
 
 **Limitations of this audit.**
 
@@ -441,9 +482,16 @@ finding** — see the correction in §2.6. Auditing only the DB-down state made 
 `events` table look clean when it held nothing but fabricated rows.
 
 As of 2026-08-15 the database has been read directly and all five proof suites run
-against it (126 assertions: `pages` 22, `rbac` 19, `uploads` 14, `behaviors` 6,
-`content` 65). Content was modified from this point on — migrations 0017, 0018 and
-0019 — where the original pass modified nothing.
+against it (**156 assertions**: `content` 89, `pages` 22, `rbac` 19, `uploads` 14,
+`behaviors` 12), plus `prove:concurrency`. Content was modified from this point on —
+migrations 0017 through 0022 — where the original pass modified nothing.
+
+Every assertion added for §7.2 was mutation-tested: each production change was
+reverted one at a time and the suite re-run, confirming the intended assertion
+fails. Eight mutations, eight caught — republishing the constants, rendering the
+footer row unconditionally, linking the raw settings value, disabling the blank
+filter, restoring `required` on the schema (email and phone separately) and on the
+form input, and dropping 0022's guard.
 
 Two items remain unverified because they need credentials rather than access:
 
