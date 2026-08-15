@@ -6,6 +6,14 @@ import { ContactForm } from "@/components/contact/contact-form";
 import { Faq } from "@/components/contact/faq";
 import { Reveal } from "@/components/shared/reveal";
 import { getSiteSettings } from "@/lib/data/site";
+import { publishedContact } from "@/lib/content/contact";
+
+type ContactItem = {
+  icon: typeof MapPin;
+  label: string;
+  value: string;
+  href?: string;
+};
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -15,10 +23,13 @@ export const metadata: Metadata = {
 
 export default async function ContactPage() {
   const { site } = await getSiteSettings();
-  const contactItems = [
+  // A withheld channel is dropped from the list entirely, rather than rendering
+  // a card with an empty value under its label.
+  const { email, phone } = publishedContact(site);
+  const contactItems: ContactItem[] = [
     { icon: MapPin, label: "Province Office", value: site.office },
-    { icon: Mail, label: "Email", value: site.email, href: `mailto:${site.email}` },
-    { icon: Phone, label: "Phone", value: site.phone, href: `tel:${site.phone}` },
+    ...(email ? [{ icon: Mail, label: "Email", value: email, href: `mailto:${email}` }] : []),
+    ...(phone ? [{ icon: Phone, label: "Phone", value: phone, href: `tel:${phone}` }] : []),
   ];
   return (
     <>

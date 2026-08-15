@@ -21,10 +21,20 @@ const code = (p) => stripComments(read(p));
 // Same rule for SQL: a `--` line explaining which invented event was retired is
 // documentation, not something the file inserts.
 const sql = (p) => read(p).replace(/^\s*--.*$/gm, "");
+// A file or module that does not exist yet must fail the assertion that needs
+// it, not crash the suite before the other seventy have run.
+const tryRead = (p) => { try { return read(p); } catch { return ""; } };
+const trySql = (p) => tryRead(p).replace(/^\s*--.*$/gm, "");
+const tryImport = async (p) => { try { return await import(p); } catch { return null; } };
 
 const { SITE } = await import("../src/lib/constants.ts");
 const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
 const { isVerified } = await import("../src/lib/content/fixtures.ts");
+
+// The Phase-1 contact stand-ins, named once. They are still spelled out in the
+// 0013 seed and in 0022's guard, so the suite needs the literals to check both.
+const PLACEHOLDER_PHONE = "+63 962 000 0000";
+const PLACEHOLDER_EMAIL = "hello@zubidayfc.org";
 
 let pass = 0, fail = 0;
 const check = (n, c, got) =>
@@ -35,7 +45,10 @@ const check = (n, c, got) =>
 // the site shows one set of details when the DB is up and another when it is
 // down — the exact conflicting-contact-information failure the audit checked for.
 const seed = read("supabase/migrations/0013_site_settings.sql");
-const seedHas = (v) => seed.includes(v.replace(/'/g, "''"));
+// A blank never counts as a match: `"".includes("")` is true, so a withheld
+// value would sail through this loop having proved nothing. That vacuous-pass
+// trap has already cost this audit two assertions (§7.1).
+const seedHas = (v) => v !== "" && seed.includes(v.replace(/'/g, "''"));
 
 for (const [field, value] of Object.entries({
   name: SITE.name,
@@ -43,14 +56,16 @@ for (const [field, value] of Object.entries({
   tagline: SITE.tagline,
   description: SITE.description,
   province: SITE.province,
-  email: SITE.email,
-  phone: SITE.phone,
   office: SITE.office,
   facebook: SITE.socials.facebook,
   instagram: SITE.socials.instagram,
 })) {
   check(`site_settings seed matches SITE.${field}`, seedHas(value), value);
 }
+
+// email and phone are deliberately absent from that loop. They are withheld
+// rather than matched, and 0013 still carries the stand-ins it seeded — §9
+// asserts that both sides are now blank instead.
 
 // site_url arrived in 0018, not the 0013 seed.
 const m18 = read("supabase/migrations/0018_site_url.sql");
@@ -225,7 +240,11 @@ const { siteSettingsSchema } = await import("../src/lib/validation/site.ts");
 const validSettings = {
   name: SITE.name, full_name: SITE.fullName, tagline: SITE.tagline,
   description: SITE.description, province: SITE.province, site_url: SITE.url,
-  email: SITE.email, phone: SITE.phone, office: SITE.office,
+  // Concrete values, not SITE.email/SITE.phone: this section is about whether
+  // the shape rules hold, and those constants are now deliberately blank (§9).
+  // Seeding the fixture from them would turn every case below into a test of
+  // blank-handling instead.
+  email: "office@example.org", phone: "+63 917 123 4567", office: SITE.office,
   facebook_url: SITE.socials.facebook, instagram_url: SITE.socials.instagram,
   footer_explore_heading: "Explore", footer_reach_heading: "Reach Us",
   footer_closing_line: "Line",
@@ -243,10 +262,111 @@ check("rejects a phone with too few digits", !accepts({ phone: "+63 12" }), null
 check("accepts a normally punctuated phone", accepts({ phone: "+63 (962) 123-4567" }), null);
 
 // Stated plainly: shape validation cannot tell a well-formed placeholder from a
-// real number. `+63 962 000 0000` passes and is still on the confirmation list.
+// real number. `+63 962 000 0000` passes — which is why §9 withholds it instead
+// of trying to validate it away.
 check(
   "shape validation alone does not catch a placeholder number",
-  accepts({ phone: "+63 962 000 0000" }),
+  accepts({ phone: PLACEHOLDER_PHONE }),
+  null,
+);
+
+// Withholding has to be expressible, or the only way to stop publishing a
+// placeholder is to invent a replacement for it.
+check("allows a blank email (withholds the address)", accepts({ email: "" }), null);
+check("allows a blank phone (withholds the number)", accepts({ phone: "" }), null);
+check("still rejects a malformed non-blank email", !accepts({ email: "hello@" }), null);
+check("still rejects a malformed non-blank phone", !accepts({ phone: "+63 12" }), null);
+
+// ── 9. Contact details are withheld until the office confirms them ─────────
+// `+63 962 000 0000` and `hello@zubidayfc.org` were Phase-1 stand-ins that
+// reached production. Every other unverified claim was withheld; these were
+// published, because a well-formed placeholder looks exactly like a real value.
+// The fix is to stop rendering them: blank in the constants, blank in the
+// database, and no element at all on the page.
+
+check("SITE withholds the placeholder phone", SITE.phone === "", SITE.phone);
+check("SITE withholds the placeholder email", SITE.email === "", SITE.email);
+
+// The outage fallback is the other door into production (§7.1). A blank stored
+// value must not be "corrected" back to a stand-in when the database is down.
+const siteData = code("src/lib/data/site.ts");
+check(
+  "the outage fallback reintroduces neither contact stand-in",
+  !siteData.includes(PLACEHOLDER_PHONE) && !siteData.includes(PLACEHOLDER_EMAIL),
+  null,
+);
+
+// One rule decides what is publishable, so a new surface cannot forget it — the
+// same reason 0020 put slot release in a trigger rather than in one code path.
+const contactLib = await tryImport("../src/lib/content/contact.ts");
+const published = (patch) =>
+  contactLib?.publishedContact({ email: "office@example.org", phone: "+63 917 123 4567", ...patch }) ?? {};
+
+check("publishes a confirmed email", published({}).email === "office@example.org", published({}));
+check("publishes a confirmed phone", published({}).phone === "+63 917 123 4567", published({}));
+check("withholds a blank email", published({ email: "" }).email === null, published({ email: "" }));
+check("withholds a blank phone", published({ phone: "" }).phone === null, published({ phone: "" }));
+check(
+  "withholds a whitespace-only number rather than rendering the spaces",
+  published({ phone: "   " }).phone === null,
+  published({ phone: "   " }),
+);
+check(
+  "trims a padded address rather than publishing the padding",
+  published({ email: "  office@example.org  " }).email === "office@example.org",
+  published({ email: "  office@example.org  " }),
+);
+check(
+  "withholding one channel does not withhold the other",
+  published({ phone: "" }).email === "office@example.org",
+  published({ phone: "" }),
+);
+
+// Both public surfaces must go through that filter rather than reading the raw
+// settings value — otherwise a withheld channel renders an empty label, or a
+// `mailto:` link to nothing.
+const footer = code("src/components/layout/footer.tsx");
+const contactPage = code("src/app/contact/page.tsx");
+
+check("footer routes contact details through publishedContact", /publishedContact\(/.test(footer), null);
+check("contact page routes contact details through publishedContact", /publishedContact\(/.test(contactPage), null);
+check("footer omits the email row when the address is withheld", /\{\s*email\s*&&/.test(footer), null);
+check("footer omits the phone row when the number is withheld", /\{\s*phone\s*&&/.test(footer), null);
+check(
+  "contact page builds no link from a raw settings value",
+  !/mailto:\$\{site\.email\}/.test(contactPage) && !/tel:\$\{site\.phone\}/.test(contactPage),
+  null,
+);
+
+// A schema that accepts a blank is not enough on its own: a `required` input
+// means the browser refuses to submit one, so the administrator has no way to
+// withhold a channel they cannot confirm. Socials already carry the affordance
+// ("Leave blank to hide the icon"); contact details need the same.
+const settingsForm = code("src/app/admin/settings/_components/settings-form.tsx");
+const inputFor = (name) => new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(settingsForm)?.[0] ?? "";
+
+check("the email field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("email")), inputFor("email"));
+check("the phone field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("phone")), inputFor("phone"));
+check("the office address is still required", /\brequired\b/.test(inputFor("office")), inputFor("office"));
+check("the contact section says what a blank field means", /Leave blank to withhold/.test(settingsForm), null);
+
+// And the rows already in the database have to be cleared, not merely stopped
+// from being re-seeded — the lesson 0019 taught about the invented events.
+const m22 = trySql("supabase/migrations/0022_withhold_placeholder_contact.sql");
+check(
+  "migration 0022 blanks the stored placeholder phone",
+  m22.includes(PLACEHOLDER_PHONE) && /phone\s*=\s*''/.test(m22),
+  null,
+);
+check(
+  "migration 0022 blanks the stored placeholder email",
+  m22.includes(PLACEHOLDER_EMAIL) && /email\s*=\s*''/.test(m22),
+  null,
+);
+check(
+  "migration 0022 only clears rows still carrying the stand-in",
+  /where[\s\S]*phone\s*=\s*'\+63 962 000 0000'/i.test(m22) &&
+    /where[\s\S]*email\s*=\s*'hello@zubidayfc\.org'/i.test(m22),
   null,
 );
 

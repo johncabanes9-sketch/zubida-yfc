@@ -6,8 +6,13 @@ export const SITE = {
     "The official Youth for Christ community of Zamboanga del Sur — building Christ-centered leaders and empowering young people across the province.",
   province: "Zamboanga del Sur",
   url: "https://zubidayfc.org",
-  email: "hello@zubidayfc.org",
-  phone: "+63 962 000 0000",
+  // Withheld until the provincial office confirms them. These carried
+  // `hello@zubidayfc.org` and `+63 962 000 0000` — Phase-1 stand-ins that
+  // reached production because a well-formed placeholder passes every shape
+  // check. Blank here means the DB-outage fallback publishes no contact
+  // details either; see src/lib/content/contact.ts.
+  email: "",
+  phone: "",
   office: "YFC Provincial Office, Pagadian City, Zamboanga del Sur",
   socials: {
     facebook: "https://facebook.com/zubidayfc",
