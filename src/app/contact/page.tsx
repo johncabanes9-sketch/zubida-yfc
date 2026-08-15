@@ -6,6 +6,14 @@ import { ContactForm } from "@/components/contact/contact-form";
 import { Faq } from "@/components/contact/faq";
 import { Reveal } from "@/components/shared/reveal";
 import { getSiteSettings } from "@/lib/data/site";
+import { publishedContact } from "@/lib/content/contact";
+
+type ContactItem = {
+  icon: typeof MapPin;
+  label: string;
+  value: string;
+  href?: string;
+};
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -15,10 +23,13 @@ export const metadata: Metadata = {
 
 export default async function ContactPage() {
   const { site } = await getSiteSettings();
-  const contactItems = [
+  // A withheld channel is dropped from the list entirely, rather than rendering
+  // a card with an empty value under its label.
+  const { email, phone } = publishedContact(site);
+  const contactItems: ContactItem[] = [
     { icon: MapPin, label: "Province Office", value: site.office },
-    { icon: Mail, label: "Email", value: site.email, href: `mailto:${site.email}` },
-    { icon: Phone, label: "Phone", value: site.phone, href: `tel:${site.phone}` },
+    ...(email ? [{ icon: Mail, label: "Email", value: email, href: `mailto:${email}` }] : []),
+    ...(phone ? [{ icon: Phone, label: "Phone", value: phone, href: `tel:${phone}` }] : []),
   ];
   return (
     <>
@@ -56,24 +67,30 @@ export default async function ContactPage() {
                 </Reveal>
               ))}
 
-              <Reveal delay={0.3}>
-                <div className="flex gap-3">
-                  <a
-                    href={site.socials.facebook}
-                    aria-label="Facebook"
-                    className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
-                  >
-                    <Facebook className="h-5 w-5" />
-                  </a>
-                  <a
-                    href={site.socials.instagram}
-                    aria-label="Instagram"
-                    className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
-                  >
-                    <Instagram className="h-5 w-5" />
-                  </a>
-                </div>
-              </Reveal>
+              {(site.socials.facebook || site.socials.instagram) && (
+                <Reveal delay={0.3}>
+                  <div className="flex gap-3">
+                    {site.socials.facebook && (
+                      <a
+                        href={site.socials.facebook}
+                        aria-label="Facebook"
+                        className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
+                      >
+                        <Facebook className="h-5 w-5" />
+                      </a>
+                    )}
+                    {site.socials.instagram && (
+                      <a
+                        href={site.socials.instagram}
+                        aria-label="Instagram"
+                        className="glass grid h-12 w-12 place-items-center rounded-xl text-royal-700 shadow-card transition-colors hover:bg-royal-700/10 dark:text-gold-300"
+                      >
+                        <Instagram className="h-5 w-5" />
+                      </a>
+                    )}
+                  </div>
+                </Reveal>
+              )}
 
               {/* Stylized map placeholder */}
               <Reveal delay={0.35}>

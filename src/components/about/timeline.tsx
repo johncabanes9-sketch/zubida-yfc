@@ -2,7 +2,9 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-const milestones = [
+export type Milestone = { year: string; title: string; text: string };
+
+const DEFAULT_MILESTONES: Milestone[] = [
   { year: "2003", title: "The First Spark", text: "A handful of students in Pagadian City begin gathering to pray and share the Gospel — the seed of Youth for Christ in Zamboanga del Sur." },
   { year: "2008", title: "Chapters Multiply", text: "The movement spreads north to Molave and Mahayag. The first provincial youth camp draws over 200 delegates." },
   { year: "2013", title: "Clusters Formed", text: "Chapters organize into Bay, North, and South clusters, giving every municipality a spiritual home and closer formation." },
@@ -11,7 +13,7 @@ const milestones = [
   { year: "2024", title: "One Province, One Mission", text: "With 26 chapters and thousands of members, Zubida YFC adopts its unifying vision: One Province. One Mission. One Christ." },
 ];
 
-export function Timeline() {
+export function Timeline({ milestones = DEFAULT_MILESTONES }: { milestones?: Milestone[] }) {
   const reduce = useReducedMotion();
   return (
     <div className="relative mx-auto max-w-3xl">
@@ -25,9 +27,7 @@ export function Timeline() {
             viewport={{ once: true, margin: "-80px" }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`relative pl-12 sm:w-1/2 sm:pl-0 ${
-              i % 2 === 0
-                ? "sm:pr-12 sm:text-right"
-                : "sm:ml-auto sm:pl-12"
+              i % 2 === 0 ? "sm:pr-12 sm:text-right" : "sm:ml-auto sm:pl-12"
             }`}
           >
             <span
@@ -36,9 +36,7 @@ export function Timeline() {
               }`}
             />
             <div className="glass rounded-2xl p-6 shadow-card">
-              <span className="font-display text-2xl font-semibold text-royal-700 dark:text-gold-300">
-                {m.year}
-              </span>
+              <span className="font-display text-2xl font-semibold text-royal-700 dark:text-gold-300">{m.year}</span>
               <h3 className="mt-1 text-lg font-semibold">{m.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{m.text}</p>
             </div>

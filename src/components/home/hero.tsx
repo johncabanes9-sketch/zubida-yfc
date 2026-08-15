@@ -7,17 +7,28 @@ import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Sunburst } from "@/components/shared/sunburst";
 import { SITE } from "@/lib/constants";
+import { isVerified } from "@/lib/content/fixtures";
 
+// Phase-1 placeholders from picsum.photos, captioned as Youth for Christ
+// gatherings in Zamboanga del Sur. Until real photographs are supplied the hero
+// renders its branded gradient treatment instead of stock imagery.
 const slides = [
   "https://picsum.photos/seed/hero-worship/1600/1000",
   "https://picsum.photos/seed/hero-camp/1600/1000",
   "https://picsum.photos/seed/hero-mission/1600/1000",
 ];
 
-export function Hero({ province = SITE.province }: { province?: string } = {}) {
+const showPhotos = isVerified("photography");
+
+export function Hero({
+  province = SITE.province,
+  name = SITE.name,
+  description = SITE.description,
+}: { province?: string; name?: string; description?: string } = {}) {
   const [active, setActive] = useState(0);
 
   useEffect(() => {
+    if (!showPhotos) return;
     const t = setInterval(() => setActive((a) => (a + 1) % slides.length), 5000);
     return () => clearInterval(t);
   }, []);
@@ -25,27 +36,29 @@ export function Hero({ province = SITE.province }: { province?: string } = {}) {
   return (
     <section className="relative flex min-h-[100svh] items-center overflow-hidden">
       {/* Slideshow */}
-      <div className="absolute inset-0 -z-20">
-        <AnimatePresence>
-          <motion.div
-            key={active}
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.6, ease: "easeInOut" }}
-            className="absolute inset-0"
-          >
-            <Image
-              src={slides[active]}
-              alt="Youth for Christ in Zamboanga del Sur"
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      {showPhotos && (
+        <div className="absolute inset-0 -z-20">
+          <AnimatePresence>
+            <motion.div
+              key={active}
+              initial={{ opacity: 0, scale: 1.08 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.6, ease: "easeInOut" }}
+              className="absolute inset-0"
+            >
+              <Image
+                src={slides[active]}
+                alt={`Youth for Christ in ${province}`}
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover"
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Overlays: dawn gradient + radiant "light of Christ" glow */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-midnight-950/92 via-midnight-900/80 to-royal-800/70" />
@@ -80,7 +93,7 @@ export function Hero({ province = SITE.province }: { province?: string } = {}) {
           >
             Welcome to{" "}
             <span className="relative whitespace-nowrap text-gold-300">
-              Zubida YFC
+              {name}
             </span>
           </motion.h1>
 
@@ -90,8 +103,7 @@ export function Hero({ province = SITE.province }: { province?: string } = {}) {
             transition={{ duration: 0.7, delay: 0.25 }}
             className="mt-6 max-w-xl text-lg leading-relaxed text-cream/85"
           >
-            Building Christ-centered leaders and empowering young people across
-            Zamboanga del Sur. One province, one mission, one Christ.
+            {description}
           </motion.p>
 
           <motion.div
@@ -118,18 +130,20 @@ export function Hero({ province = SITE.province }: { province?: string } = {}) {
       </div>
 
       {/* Slide indicators */}
-      <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            aria-label={`Go to slide ${i + 1}`}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === active ? "w-8 bg-gold-400" : "w-2 bg-white/40 hover:bg-white/70"
-            }`}
-          />
-        ))}
-      </div>
+      {showPhotos && (
+        <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActive(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === active ? "w-8 bg-gold-400" : "w-2 bg-white/40 hover:bg-white/70"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

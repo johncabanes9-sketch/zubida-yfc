@@ -3,6 +3,8 @@ import { HeartHandshake, Sparkles, Users } from "lucide-react";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/shared/reveal";
+import { isVerified } from "@/lib/content/fixtures";
+import { cn } from "@/lib/utils";
 
 const pillars = [
   { icon: Sparkles, title: "Evangelization", text: "Sharing the joy of the Gospel with every young person in the province." },
@@ -11,9 +13,20 @@ const pillars = [
 ];
 
 export function AboutTeaser() {
+  // The collage is picsum.photos stock captioned as YFC worship, households, and
+  // missions. Without it the section runs as a single column rather than
+  // illustrating the organization with photographs of unrelated people.
+  const showPhotos = isVerified("photography");
+
   return (
     <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-      <div className="grid items-center gap-14 lg:grid-cols-2">
+      <div
+        className={cn(
+          "grid items-center gap-14",
+          showPhotos ? "lg:grid-cols-2" : "mx-auto max-w-3xl",
+        )}
+      >
+        {showPhotos && (
         <Reveal>
           <div className="relative">
             <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-radiant blur-2xl" />
@@ -44,6 +57,7 @@ export function AboutTeaser() {
             </div>
           </div>
         </Reveal>
+        )}
 
         <div>
           <SectionHeading

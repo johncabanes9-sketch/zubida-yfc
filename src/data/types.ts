@@ -19,6 +19,8 @@ export interface Leader {
 export type EventStatus = "Open" | "Closed" | "Finished";
 export type EventScope = "Provincial" | "Chapter";
 
+export type EventImage = { url: string; alt: string };
+
 export interface EventItem {
   id: string;
   name: string;
@@ -33,6 +35,7 @@ export interface EventItem {
   slotsTaken: number;
   status: EventStatus;
   scope: EventScope;
+  images?: EventImage[];
 }
 
 export interface Chapter {

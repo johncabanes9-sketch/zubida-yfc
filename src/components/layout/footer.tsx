@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/constants";
+import { publishedContact } from "@/lib/content/contact";
 import { Sunburst } from "@/components/shared/sunburst";
 import type { SiteSettings, NavItem } from "@/lib/data/site";
 
@@ -17,8 +18,11 @@ export function Footer({
   const description = s?.description ?? SITE.description;
   const tagline = s?.tagline ?? SITE.tagline;
   const office = s?.office ?? SITE.office;
-  const email = s?.email ?? SITE.email;
-  const phone = s?.phone ?? SITE.phone;
+  // Withheld channels render nothing — not an empty label, not a dead mailto:.
+  const { email, phone } = publishedContact({
+    email: s?.email ?? SITE.email,
+    phone: s?.phone ?? SITE.phone,
+  });
   const facebook = s?.socials.facebook ?? SITE.socials.facebook;
   const instagram = s?.socials.instagram ?? SITE.socials.instagram;
   const exploreHeading = s?.footerExploreHeading ?? "Explore";
@@ -92,18 +96,22 @@ export function Footer({
               <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold-300" />
               {office}
             </li>
-            <li className="flex gap-3">
-              <Mail className="mt-0.5 h-5 w-5 shrink-0 text-gold-300" />
-              <a href={`mailto:${email}`} className="hover:text-gold-300">
-                {email}
-              </a>
-            </li>
-            <li className="flex gap-3">
-              <Phone className="mt-0.5 h-5 w-5 shrink-0 text-gold-300" />
-              <a href={`tel:${phone}`} className="hover:text-gold-300">
-                {phone}
-              </a>
-            </li>
+            {email && (
+              <li className="flex gap-3">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-gold-300" />
+                <a href={`mailto:${email}`} className="hover:text-gold-300">
+                  {email}
+                </a>
+              </li>
+            )}
+            {phone && (
+              <li className="flex gap-3">
+                <Phone className="mt-0.5 h-5 w-5 shrink-0 text-gold-300" />
+                <a href={`tel:${phone}`} className="hover:text-gold-300">
+                  {phone}
+                </a>
+              </li>
+            )}
           </ul>
         </div>
       </div>

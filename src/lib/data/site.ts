@@ -9,6 +9,8 @@ export type SiteSettings = {
   tagline: string;
   description: string;
   province: string;
+  /** Canonical origin used for metadataBase (canonical links, OG image URLs). */
+  siteUrl: string;
   email: string;
   phone: string;
   office: string;
@@ -30,6 +32,7 @@ const FALLBACK: SiteData = {
     tagline: SITE.tagline,
     description: SITE.description,
     province: SITE.province,
+    siteUrl: SITE.url,
     email: SITE.email,
     phone: SITE.phone,
     office: SITE.office,
@@ -64,6 +67,8 @@ export async function getSiteSettings(): Promise<SiteData> {
           tagline: row.tagline,
           description: row.description,
           province: row.province,
+          // Rows predating 0018 have no site_url; the constant keeps metadataBase valid.
+          siteUrl: row.site_url ?? SITE.url,
           email: row.email,
           phone: row.phone,
           office: row.office,

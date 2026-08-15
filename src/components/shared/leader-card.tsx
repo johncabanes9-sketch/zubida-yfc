@@ -3,7 +3,19 @@ import { Facebook, Instagram, Quote } from "lucide-react";
 import type { Leader } from "@/data/types";
 import { Reveal } from "./reveal";
 
+/** A profile link is only worth rendering if it actually goes somewhere.
+ *  Placeholder hrefs like "#" render as a clickable icon that does nothing,
+ *  which reads to a visitor as a broken or dead account. */
+function isRealLink(url: string | undefined): url is string {
+  if (!url) return false;
+  const trimmed = url.trim();
+  return trimmed !== "" && trimmed !== "#" && !trimmed.startsWith("#");
+}
+
 export function LeaderCard({ leader, delay = 0 }: { leader: Leader; delay?: number }) {
+  const facebook = isRealLink(leader.socials?.facebook) ? leader.socials!.facebook : null;
+  const instagram = isRealLink(leader.socials?.instagram) ? leader.socials!.instagram : null;
+
   return (
     <Reveal delay={delay}>
       <article className="group glass flex h-full flex-col overflow-hidden rounded-3xl shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-soft">
@@ -31,20 +43,20 @@ export function LeaderCard({ leader, delay = 0 }: { leader: Leader; delay?: numb
           <p className="mt-2 flex-1 text-sm italic leading-relaxed text-muted">
             {leader.message}
           </p>
-          {(leader.socials?.facebook || leader.socials?.instagram) && (
+          {(facebook || instagram) && (
             <div className="mt-4 flex gap-2">
-              {leader.socials.facebook && (
+              {facebook && (
                 <a
-                  href={leader.socials.facebook}
+                  href={facebook}
                   aria-label={`${leader.name} on Facebook`}
                   className="grid h-8 w-8 place-items-center rounded-full bg-royal-700/10 text-royal-700 transition-colors hover:bg-royal-700/20 dark:text-gold-300"
                 >
                   <Facebook className="h-4 w-4" />
                 </a>
               )}
-              {leader.socials.instagram && (
+              {instagram && (
                 <a
-                  href={leader.socials.instagram}
+                  href={instagram}
                   aria-label={`${leader.name} on Instagram`}
                   className="grid h-8 w-8 place-items-center rounded-full bg-royal-700/10 text-royal-700 transition-colors hover:bg-royal-700/20 dark:text-gold-300"
                 >

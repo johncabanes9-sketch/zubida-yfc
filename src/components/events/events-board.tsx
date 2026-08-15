@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarX } from "lucide-react";
+import { CalendarX, CloudOff } from "lucide-react";
 import type { EventItem } from "@/data/types";
 import { EventCard } from "@/components/shared/event-card";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,15 @@ import { cn } from "@/lib/utils";
 type TimeFilter = "Upcoming" | "Past" | "All";
 type ScopeFilter = "All" | "Provincial" | "Chapter";
 
-export function EventsBoard({ events }: { events: EventItem[] }) {
+export function EventsBoard({
+  events,
+  status = "ok",
+}: {
+  events: EventItem[];
+  /** `unavailable` means the schedule could not be loaded — say so rather than
+   *  showing "no events", which would assert something we do not know. */
+  status?: "ok" | "unavailable";
+}) {
   const [time, setTime] = useState<TimeFilter>("Upcoming");
   const [scope, setScope] = useState<ScopeFilter>("All");
 
@@ -23,7 +31,7 @@ export function EventsBoard({ events }: { events: EventItem[] }) {
       const matchesScope = scope === "All" || e.scope === scope;
       return matchesTime && matchesScope;
     });
-  }, [time, scope]);
+  }, [events, time, scope]);
 
   return (
     <div>
@@ -63,7 +71,18 @@ export function EventsBoard({ events }: { events: EventItem[] }) {
         </div>
       </div>
 
-      {filtered.length > 0 ? (
+      {status === "unavailable" ? (
+        <div className="glass flex flex-col items-center justify-center rounded-3xl py-20 text-center">
+          <CloudOff className="h-12 w-12 text-muted" />
+          <p className="mt-4 font-display text-xl">
+            The event schedule can&apos;t be loaded right now
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            This is a temporary problem on our end, not an empty calendar. Please
+            try again shortly.
+          </p>
+        </div>
+      ) : filtered.length > 0 ? (
         <div className="grid gap-7 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((e, i) => (
             <EventCard key={e.id} event={e} delay={(i % 3) * 0.1} />

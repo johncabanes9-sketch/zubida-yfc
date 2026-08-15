@@ -113,7 +113,52 @@ async function authedClient(email) {
   check("PYH CAN write site_settings", pyhWrite.data?.[0]?.tagline === "PYH proof write", pyhWrite.error?.message ?? pyhWrite.data);
   await admin.from("site_settings").update({ tagline: originalTagline }).eq("id", 1);
 
+  // 14–17. EVENT_IMAGES — ownership must mirror the parent event.
+  const { data: imgA } = await admin.from("event_images")
+    .insert({ event_id: evA.id, path: `events/${evA.id}/proof-a.jpg`, sort_order: 0, created_by: pyhId })
+    .select("id").single();
+  const { data: imgB } = await admin.from("event_images")
+    .insert({ event_id: evB.id, path: `events/${evB.id}/proof-b.jpg`, sort_order: 0, created_by: pyhId })
+    .select("id").single();
+
+  // 14. CH CANNOT insert an image on cluster-B's event.
+  const insBImg = await ch.from("event_images")
+    .insert({ event_id: evB.id, path: "events/hack.jpg", sort_order: 0 }).select("id");
+  check("CH CANNOT insert image on cluster-B event", insBImg.error !== null || (insBImg.data?.length ?? 0) === 0, insBImg.error?.message ?? insBImg.data);
+
+  // 15. CH CANNOT delete cluster-B's image. A blocked delete is not an error —
+  // RLS filters the row out — so assert the row SURVIVES rather than trusting the response.
+  await ch.from("event_images").delete().eq("id", imgB.id);
+  const survivorB = await admin.from("event_images").select("id").eq("id", imgB.id);
+  check("CH CANNOT delete cluster-B image (row survives)", survivorB.data?.length === 1, survivorB.data);
+
+  // 16. Anon CAN read images but CANNOT write them.
+  const anonClient = createClient(url, anon, { auth: { persistSession: false } });
+  const anonRead = await anonClient.from("event_images").select("id").eq("id", imgA.id);
+  const anonWrite = await anonClient.from("event_images")
+    .insert({ event_id: evA.id, path: "events/anon.jpg", sort_order: 9 }).select("id");
+  check("anon CAN read event_images", !anonRead.error && anonRead.data.length === 1, anonRead.error?.message);
+  check("anon CANNOT insert event_images", anonWrite.error !== null || (anonWrite.data?.length ?? 0) === 0, anonWrite.error?.message ?? anonWrite.data);
+
+  // 17. POSITIVE CONTROL: CH CAN insert an image on its OWN cluster's event.
+  const insAImg = await ch.from("event_images")
+    .insert({ event_id: evA.id, path: `events/${evA.id}/ch-own.jpg`, sort_order: 1 }).select("id");
+  check("CH CAN insert image on own cluster-A event", !insAImg.error && insAImg.data?.length === 1, insAImg.error?.message ?? insAImg.data);
+
+  // 18. DELIBERATE DESIGN, PROVEN: a same-cluster admin who did NOT create the
+  // event CAN still delete its images, even though events_delete (0011) would
+  // forbid deleting the event itself (it requires created_by = auth.uid()).
+  // Managing photos is treated as an EDIT to the event — which events_update
+  // already allows any same-cluster admin to do — not as deleting the event.
+  // This asymmetry is intentional and accepted; it is asserted here so that it
+  // is a proven decision rather than an accident of `for all` policy semantics.
+  // evA was created by pyhId, NOT by the cluster head, so this is exactly the case.
+  await ch.from("event_images").delete().eq("id", imgA.id);
+  const goneA = await admin.from("event_images").select("id").eq("id", imgA.id);
+  check("CH CAN delete image on a same-cluster event it did NOT create (intentional)", goneA.data?.length === 0, goneA.data);
+
   // cleanup
+  await admin.from("event_images").delete().in("event_id", [evA.id, evB.id]);
   await admin.from("events").delete().in("cluster_id", [clusterA, clusterB]).like("name", "RBAC %");
   await admin.from("events").delete().eq("name", "CH new");
   await admin.from("audit_log").delete().eq("action", "rbac.proof.marker");
