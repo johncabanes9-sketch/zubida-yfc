@@ -2,8 +2,13 @@
 // cluster A, events in clusters A and B, then asserts the cluster head is
 // confined to cluster A and cannot manage users. Cleans up after itself.
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -156,6 +161,46 @@ async function authedClient(email) {
   await ch.from("event_images").delete().eq("id", imgA.id);
   const goneA = await admin.from("event_images").select("id").eq("id", imgA.id);
   check("CH CAN delete image on a same-cluster event it did NOT create (intentional)", goneA.data?.length === 0, goneA.data);
+
+  // ── The bootstrap path has to produce a usable PYH ───────────────────────
+  // /admin/users can only ever create a cluster_head, so setup-admin.mjs is the
+  // ONLY way the provincial youth head account comes into existence — the
+  // account that owns the page CMS, site settings, and every requirePYH action.
+  // A stale role there is invisible: is_admin() still returns true, the account
+  // signs in, the dashboard loads, and only the PYH-gated surfaces silently
+  // redirect. Asserted statically so it cannot rot again as roles evolve.
+  const setupSrc = readFileSync(join(root, "scripts/setup-admin.mjs"), "utf8");
+  const rbacSrc = readFileSync(join(root, "src/lib/rbac.ts"), "utf8");
+  const knownRoles = [...rbacSrc.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  const seededRole = setupSrc.match(/role:\s*"([a-z_]+)"/)?.[1];
+
+  check("the app recognizes exactly two admin roles", knownRoles.length === 2, knownRoles);
+  check(
+    "the bootstrap script seeds a role the application recognizes",
+    knownRoles.includes(seededRole),
+    { seededRole, knownRoles },
+  );
+  check(
+    "the bootstrap script seeds the PYH, the only role that can reach the page CMS",
+    seededRole === "provincial_youth_head",
+    seededRole,
+  );
+  // Retired events keep status 'Open' — 0019 soft-deletes, it does not close.
+  // So picking "some Open event" attaches the proof registration to an event
+  // nobody should be able to register for, and makes the check depend on the
+  // database having any events at all. It has to bring its own.
+  check(
+    "the bootstrap script proves against an event it creates, not an arbitrary existing one",
+    /from\("events"\)\s*\.?\s*insert\(/.test(setupSrc) && !/\.eq\("status",\s*"Open"\)/.test(setupSrc),
+    null,
+  );
+  // It targets a real account by default; silently changing that account's
+  // password is not something a setup script should do without being asked.
+  check(
+    "the bootstrap script does not reset an existing account's password unasked",
+    !/updateUserById\([^)]*password[^)]*\)/.test(setupSrc) || /RESET_PASSWORD/.test(setupSrc),
+    null,
+  );
 
   // cleanup
   await admin.from("event_images").delete().in("event_id", [evA.id, evB.id]);
