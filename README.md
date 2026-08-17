@@ -46,6 +46,35 @@ npm run build   # production build
 npm start       # serve the production build
 ```
 
+## Verification
+
+Each `prove:*` script is a standalone assertion suite that prints `N passed,
+M failed` and exits non-zero on any failure.
+
+```bash
+npm run prove:content      # 89 assertions — the only suite that needs no database
+npm run prove:rbac         # 24 — role policies
+npm run prove:pages        #  22 — page CMS data layer
+npm run prove:uploads      # 14 — image validation + storage ownership
+npm run prove:behaviors    # 12 — registration/slot behaviour
+npm run prove:concurrency  #      slot race conditions
+npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
+```
+
+`prove:editor` is the only suite that drives a browser, and the only one that
+edits published content — it snapshots `/about`, edits it, restores it, and then
+asserts the restore succeeded. Two things it needs that the others don't:
+
+```bash
+npx playwright install chromium   # the binary lives in the Playwright cache,
+                                  # not node_modules — `npm ci` is not enough
+```
+
+and a **dev server**. It starts its own `next dev` when nothing is answering on
+port 3000, or reuses one via `BASE_URL`. Do not point it at `npm start`: `/about`
+sets `revalidate = 60`, so a production server can serve cached HTML and the
+public-page assertions would read stale markup after a successful edit.
+
 ## Project Structure
 
 ```

@@ -14,7 +14,8 @@
     "prove:rbac": "node scripts/prove-rbac.mjs",
     "prove:uploads": "node --experimental-strip-types scripts/prove-uploads.mjs",
     "prove:pages": "node --experimental-strip-types scripts/prove-pages.mjs",
-    "prove:content": "node --experimental-strip-types scripts/prove-content.mjs"
+    "prove:content": "node --experimental-strip-types scripts/prove-content.mjs",
+    "prove:editor": "node scripts/prove-editor.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -40,6 +41,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.1.6",
     "pg": "^8.22.0",
+    "playwright": "^1.61.1",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"
