@@ -323,6 +323,12 @@ const draft = await admin.from("leaders").insert({
   name: "Draft Leader", slug: `draft-${crypto.randomUUID().slice(0, 8)}`,
   position: "Draft" }).select("id").maybeSingle();
 
+// A second published leader that survives the soft-delete below. Without one,
+// the absence assertion has nothing to be measured against.
+const pubB = await admin.from("leaders").insert({
+  name: "Surviving Leader", slug: `surv-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Area Coordinator", is_published: true }).select("id").maybeSingle();
+
 const published = await getLeaders();
 const ids = published.map((l) => l.id);
 check("getLeaders returns published leaders", ids.includes(pubA.data.id), ids);
@@ -333,6 +339,16 @@ const softDeleteUpdate = await admin.from("leaders")
 check("the soft-delete update succeeded", softDeleteUpdate.data?.length === 1, softDeleteUpdate.error?.message);
 const afterDelete = (await getLeaders()).map((l) => l.id);
 check("a soft-deleted leader leaves the public list", !afterDelete.includes(pubA.data.id), afterDelete);
+
+// getLeaders() is contractually required to swallow any database error into []
+// (the no-fixture-fallback guarantee) — so on its own, the absence check above
+// cannot tell "the deleted_at filter correctly excluded pubA" apart from "this
+// call errored and returned []". Pairing it with a presence assertion on the
+// SAME afterDelete result closes that gap. This is the identical defect fixed
+// for chapters in cb27541; do not remove it as redundant, it is what makes the
+// line above mean anything.
+check("getLeaders still returns other published leaders after the soft-delete",
+  afterDelete.includes(pubB.data.id), afterDelete);
 
 const noPhoto = published.find((l) => l.id === pubA.data.id);
 check("a leader with no photo_path yields photo === null", noPhoto?.photo === null, noPhoto?.photo);
