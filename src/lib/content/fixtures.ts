@@ -16,7 +16,6 @@
  */
 export type FixtureDomain =
   | "leaders"
-  | "chapters"
   | "news"
   | "gallery"
   | "testimonials"
@@ -26,8 +25,6 @@ export type FixtureDomain =
 const VERIFIED: Record<FixtureDomain, boolean> = {
   /** src/data/leaders.ts — 12 invented profiles, i.pravatar.cc faces. */
   leaders: false,
-  /** src/data/chapters.ts — 12 invented chapters, coordinators, member counts. */
-  chapters: false,
   /** src/data/news.ts — 6 invented articles attributed to named authors. */
   news: false,
   /** src/data/gallery.ts — 18 picsum.photos images with captions asserting real events. */
