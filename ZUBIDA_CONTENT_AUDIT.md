@@ -141,6 +141,16 @@ Rendered from `page_sections` (DB) with `src/lib/pages/fallback.ts` mirroring it
 | Map pin positions | hardcoded, explicitly "non-geographic" | acceptable (labelled stylized) | but reads as a real province map |
 | 5 coordinators (Reina Lopez, Elijah Ponce, Hannah Grace Dizon, Joshua Emmanuel Rana, Clarisse Mae Tibon) | `chapters.ts` | **INCONSISTENT** | named as chapter coordinators but absent from `/leaders` |
 
+**RESOLVED — the chapters managed domain** *(2026-08-18)*. Every row above is gone
+rather than corrected. `src/data/chapters.ts` was deleted and the stylized map
+stripped out of `chapters-explorer.tsx`. `chapters` is now a database table with
+cluster-scoped RLS (migrations 0023 and 0024) that ships **empty**, and
+`/chapters` renders a withholding notice until an administrator publishes a real
+chapter. The invented `memberCount` and "up next" fields were not carried over —
+they do not exist in the new schema, and the header no longer claims a count.
+Verified by `npm run prove:chapters` (33 assertions), two of which assert that the
+migrations insert no rows.
+
 ### 2.6 Events (`/events`)
 
 | Information | Source | Accurate? | Notes |
@@ -250,7 +260,7 @@ Editing About in the admin UI (once it exists) will update the DB but **not** th
 
 | Displayed | Claimed | What the app actually contains | Verdict |
 |---|---|---|---|
-| Chapters | **26** | `src/data/chapters.ts` lists **12** | contradicted |
+| Chapters | **26** | `src/data/chapters.ts` listed **12** (file since deleted — see §2.5) | contradicted |
 | Active Members | **4,200+** | chapter member counts sum to **2,138** | contradicted (~2× overstatement) |
 | Provincial Events | **58** | `src/data/events.ts` has 6 (4 Provincial); `events` table unknown | unsourced |
 | Trained Leaders | **340+** | `src/data/leaders.ts` lists **12** | unsourced |
@@ -260,6 +270,40 @@ The "26 chapters" figure additionally propagates into three narrative locations,
 - `/about` timeline 2024: "With 26 chapters and thousands of members"
 - `/chapters` header: "One province, twenty-six homes"
 - `/news` item n1 excerpt: "filling fast across all 26 chapters"
+
+**Partially resolved** *(2026-08-18)*. The stats band no longer reads from
+`src/data/stats.ts` — `getSiteStats()` in `src/lib/data/stats.ts` replaced the
+four hardcoded numbers, and the `/chapters` header no longer claims a count. The
+`stats` export in `src/data/stats.ts` is now imported by nothing; it survives only
+as the shape reference the fixtures gate documents.
+
+**RESOLVED — the last unrendered copy of the figure** *(2026-08-18)*. An earlier
+draft of this note claimed the figure was reachable on a database outage. That was
+wrong, and the correction belongs in the record: `PAGE_FALLBACK.about` does **not**
+contain it. The fabricated timeline lives in `UNVERIFIED_ABOUT_HISTORY`
+(`src/lib/pages/fallback.ts:17`), which is exported and referenced by nothing —
+deliberately retained so an administrator can correct the copy rather than rewrite
+it from nothing. `prove:content` §2 has covered the outage path all along: "About
+fallback renders no unverified history timeline" and "About fallback states no
+unverified chapter count".
+
+The real exposure was narrower, and had no assertion.
+`src/components/about/timeline.tsx` carried the same six milestones as a **default
+parameter** (`milestones = DEFAULT_MILESTONES`). It was unreachable through the only
+caller — `TimelineSection` always passes `content.milestones`, and `timelineSchema`
+requires `.min(1)` — but any future caller that omitted the prop would have published
+six invented milestones, the "26 chapters" figure among them, without an edit to the
+database or the fallback. Silent, and invisible to every existing check.
+
+`milestones` is now a **required** prop and the default is deleted; `tsc` passing
+confirms no caller depended on it. Two assertions were added RED-first: "the timeline
+component supplies no default milestones" and "the timeline component asserts no
+chapter count of its own".
+
+**Still withheld, not resolved:** the `/news` n1 excerpt ("filling fast across all 26
+chapters") still carries the figure in `src/data/news.ts`. It reaches no page — the
+`news: false` fixture gate withholds it — and it is corrected when the news domain
+moves to a managed table, not before.
 
 ---
 

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { ChaptersExplorer } from "@/components/chapters/chapters-explorer";
 import { UnpublishedNotice } from "@/components/shared/unpublished-notice";
-import { isVerified } from "@/lib/content/fixtures";
+import { getChapters } from "@/lib/data/chapters";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Chapters",
@@ -10,7 +12,8 @@ export const metadata: Metadata = {
     "Explore the Youth for Christ chapters across the municipalities of Zamboanga del Sur.",
 };
 
-export default function ChaptersPage() {
+export default async function ChaptersPage() {
+  const chapters = await getChapters();
   return (
     <>
       {/* Title carried the unverified "twenty-six" figure; the count is not
@@ -21,8 +24,8 @@ export default function ChaptersPage() {
         subtitle="From the bay of Pagadian to the hills of the north, find the Zubida YFC chapter nearest you and see what God is doing there."
       />
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        {isVerified("chapters") ? (
-          <ChaptersExplorer />
+        {chapters.length > 0 ? (
+          <ChaptersExplorer chapters={chapters} />
         ) : (
           <UnpublishedNotice
             title="Our chapter directory isn't published yet"

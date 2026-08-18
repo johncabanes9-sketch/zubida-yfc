@@ -49,6 +49,23 @@ export interface ClusterRow {
   created_at: string;
 }
 
+export interface ChapterRow {
+  id: string;
+  cluster_id: string;
+  name: string;
+  slug: string;
+  municipality: string;
+  schedule: string | null;
+  coordinator: string | null;
+  cover_path: string | null;
+  is_published: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+}
+
 export interface AdminRow {
   id: string;
   user_id: string;
@@ -80,6 +97,7 @@ export interface Database {
         Partial<{ action: string }>
       >;
       admins: Table<AdminRow, Partial<AdminRow>, Partial<AdminRow>>;
+      chapters: Table<ChapterRow, Partial<ChapterRow>, Partial<ChapterRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
     };
     Views: Record<string, never>;

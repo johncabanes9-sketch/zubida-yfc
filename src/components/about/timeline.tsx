@@ -4,16 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 export type Milestone = { year: string; title: string; text: string };
 
-const DEFAULT_MILESTONES: Milestone[] = [
-  { year: "2003", title: "The First Spark", text: "A handful of students in Pagadian City begin gathering to pray and share the Gospel — the seed of Youth for Christ in Zamboanga del Sur." },
-  { year: "2008", title: "Chapters Multiply", text: "The movement spreads north to Molave and Mahayag. The first provincial youth camp draws over 200 delegates." },
-  { year: "2013", title: "Clusters Formed", text: "Chapters organize into Bay, North, and South clusters, giving every municipality a spiritual home and closer formation." },
-  { year: "2017", title: "ICON is Born", text: "The Ignite Conference launches as the province's flagship annual gathering, commissioning a new wave of young leaders." },
-  { year: "2020", title: "Faith Online", text: "When the world stops, the households don't. Zubida YFC moves to virtual gatherings, keeping the youth connected through the pandemic." },
-  { year: "2024", title: "One Province, One Mission", text: "With 26 chapters and thousands of members, Zubida YFC adopts its unifying vision: One Province. One Mission. One Christ." },
-];
-
-export function Timeline({ milestones = DEFAULT_MILESTONES }: { milestones?: Milestone[] }) {
+export function Timeline({ milestones }: { milestones: Milestone[] }) {
   const reduce = useReducedMotion();
   return (
     <div className="relative mx-auto max-w-3xl">

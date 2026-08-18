@@ -38,18 +38,6 @@ export interface EventItem {
   images?: EventImage[];
 }
 
-export interface Chapter {
-  id: string;
-  name: string;
-  municipality: string;
-  coordinator: string;
-  schedule: string;
-  memberCount: number;
-  upcoming: string;
-  cover: string;
-  cluster: string;
-}
-
 export type NewsCategory =
   | "Announcement"
   | "Article"

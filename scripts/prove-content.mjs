@@ -123,6 +123,25 @@ check(
   null,
 );
 
+// The fallback is not the only way invented history could reach a page. The
+// Timeline component carried the same six milestones as a DEFAULT parameter, so
+// any caller that omitted the prop would publish them — including the retired
+// "26 chapters" figure — without touching the database or the fallback. The
+// section renderer always passes content.milestones today, which is exactly why
+// the default was invisible. A required prop makes the omission a build error
+// instead of a silent republication.
+const timelineComponent = code("src/components/about/timeline.tsx");
+check(
+  "the timeline component supplies no default milestones",
+  !/milestones\s*=\s*[A-Za-z_$]/.test(timelineComponent),
+  null,
+);
+check(
+  "the timeline component asserts no chapter count of its own",
+  !/twenty-six chapters|26 chapters/i.test(timelineComponent),
+  null,
+);
+
 // Migration 0017 must actually withhold the same things in the database.
 const m17 = read("supabase/migrations/0017_about_unverified_content.sql");
 check("migration 0017 hides the timeline section", /type = 'timeline'[\s\S]*visible = false|visible = false[\s\S]*type = 'timeline'/.test(m17), null);
@@ -132,7 +151,7 @@ check("migration 0017 rewrites the chapter-count sentence", m17.includes("twenty
 // ── 3. Placeholder media is never rendered unconditionally ─────────────────
 // The fixture modules may keep their stock URLs; the surfaces that render them
 // must be gated.
-for (const page of ["leaders", "chapters", "news", "gallery"]) {
+for (const page of ["leaders", "news", "gallery"]) {
   const src = read(`src/app/${page}/page.tsx`);
   check(
     `/${page} gates its fixture content behind isVerified`,
@@ -158,9 +177,34 @@ check(
 // ── 4. Fixture gates stay shut until content is confirmed ──────────────────
 // These flip only when an administrator supplies verified content — and the
 // domain should move to a managed table at that point, not stay a fixture.
-for (const domain of ["leaders", "chapters", "news", "gallery", "testimonials", "aboutHistory", "photography"]) {
+for (const domain of ["leaders", "news", "gallery", "testimonials", "aboutHistory", "photography"]) {
   check(`fixture domain "${domain}" is not published as fact`, isVerified(domain) === false, domain);
 }
+
+// The chapters directory moved out of the fixture system entirely (Task 4): the
+// fixture file is deleted, "chapters" is no longer a FixtureDomain, and the page
+// reads the database directly instead of gating on isVerified().
+check("the chapters fixture is deleted", tryRead("src/data/chapters.ts") === "", null);
+check(
+  "chapters is no longer a fixture domain",
+  !/"chapters"/.test(read("src/lib/content/fixtures.ts")),
+  null,
+);
+check(
+  "the chapters page reads the database, not the fixture",
+  code("src/app/chapters/page.tsx").includes("getChapters") &&
+    !code("src/app/chapters/page.tsx").includes("isVerified"),
+  null,
+);
+// An empty directory must withhold, not render an empty grid. Asserted at the
+// source because the alternative is a browser, and prove:editor already owns
+// that cost for the one page that needs it.
+check(
+  "an empty chapters list renders the withholding notice",
+  /chapters\.length\s*>\s*0\s*\?/.test(code("src/app/chapters/page.tsx")) &&
+    code("src/app/chapters/page.tsx").includes("UnpublishedNotice"),
+  null,
+);
 
 // ── 5. Statistics are derived, never asserted ──────────────────────────────
 const statsBand = read("src/components/home/stats-band.tsx");
