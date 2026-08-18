@@ -1,11 +1,12 @@
--- Returns the cluster an active admin is scoped to, or null for a PYH (whose
--- cluster_id is null) and for anyone who is not an active admin. Mirrors
--- is_pyh() in 0008b_admins_rbac.sql.
-create or replace function admin_cluster(uid uuid)
-returns uuid language sql stable security definer set search_path = public as $$
-  select cluster_id from admins
-  where user_id = uid and deleted_at is null and is_active = true
-$$;
+-- admin_cluster(uuid) already exists, defined in 0008b_admins_rbac.sql (which
+-- runs before this migration). Ten existing policy clauses across
+-- 0010_rls_rbac.sql, 0011_events_delete_active.sql, and 0015_event_images.sql
+-- depend on it for events, event_registrations, and event_images. This
+-- migration deliberately does NOT redefine it: a second `create or replace`
+-- here would be a duplicate-definition hazard — a later edit to 0008b would
+-- silently have no effect on a fresh database, because this migration runs
+-- after it and would win. The policies below simply call the existing
+-- function.
 
 -- Public: published, undeleted rows only.
 drop policy if exists chapters_public_read on chapters;
