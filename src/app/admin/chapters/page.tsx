@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 type ChapterQueryRow = Pick<
   ChapterRow,
-  "id" | "name" | "municipality" | "schedule" | "coordinator" | "is_published" | "cluster_id"
+  "id" | "name" | "municipality" | "schedule" | "coordinator" | "is_published" | "cluster_id" | "cover_path"
 > & {
   clusters: { name: string } | null;
 };
@@ -19,7 +19,7 @@ export default async function ChaptersAdmin() {
 
   const { data: chaptersData } = await supabase
     .from("chapters")
-    .select("id, name, municipality, schedule, coordinator, is_published, cluster_id, clusters(name)")
+    .select("id, name, municipality, schedule, coordinator, is_published, cluster_id, cover_path, clusters(name)")
     .is("deleted_at", null)
     .order("cluster_id", { ascending: true })
     .order("name", { ascending: true });
@@ -35,6 +35,7 @@ export default async function ChaptersAdmin() {
     is_published: c.is_published,
     cluster_id: c.cluster_id,
     cluster_name: c.clusters?.name ?? null,
+    cover_path: c.cover_path,
   }));
 
   const allClusters = (clustersData as Pick<ClusterRow, "id" | "name">[] | null) ?? [];

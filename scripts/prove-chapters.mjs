@@ -253,9 +253,32 @@ try {
   const dupe = await admin.from("chapters").insert({
     cluster_id: clusterA, name: "Dupe", slug: `partial-${stamp}`, municipality: "Test",
   }).select("id");
-  check("the database rejects a duplicate slug", !!dupe.error, dupe.error?.message ?? dupe.data);
+  // !!dupe.error alone goes green for ANY insert failure, including one from
+  // an unrelated cause (a new NOT NULL column, an FK change) — tighten to the
+  // actual constraint violation so the assertion can't pass for the wrong reason.
+  check("the database rejects a duplicate slug",
+    !!dupe.error && /duplicate key|unique/i.test(dupe.error.message), dupe.error?.message ?? dupe.data);
 
-  await admin.from("chapters").delete().eq("id", partial.data.id);
+  await admin.from("chapters").delete().eq("id", partial.data?.id);
+
+  console.log("\n── Cover images ──");
+
+  const WEBP = Buffer.from([0x52,0x49,0x46,0x46,0,0,0,0,0x57,0x45,0x42,0x50]);
+  const coverRow = (await admin.from("chapters").insert({
+    cluster_id: clusterA, name: `Cover ${stamp}`, slug: `cover-${stamp}`, municipality: "Test C",
+  }).select("id").single()).data;
+
+  const key1 = `chapters/cover-${stamp}/${crypto.randomUUID()}.webp`;
+  await admin.storage.from("media").upload(key1, WEBP, { contentType: "image/webp" });
+  await admin.from("chapters").update({ cover_path: key1 }).eq("id", coverRow.id);
+
+  const { reapPaths } = await import("../src/lib/pages/reap.ts");
+  await reapPaths(admin, [key1]);
+  const listAfter = await admin.storage.from("media").list(`chapters/cover-${stamp}`, { limit: 10 });
+  const remaining = (listAfter.data ?? []).filter((o) => o.id !== null);
+  check("reaping a cover removes the object from storage", remaining.length === 0, remaining.map((o) => o.name));
+
+  await admin.from("chapters").delete().eq("id", coverRow.id);
 } catch (e) {
   // Anything that threw above — fixture setup, or a guard between blocks.
   // Recorded rather than re-thrown so the cleanup below still runs on a live
@@ -263,7 +286,12 @@ try {
   check("the suite ran to completion", false, String(e?.message ?? e).split("\n")[0]);
 } finally {
   console.log("\n── Cleanup ──");
-  await admin.from("chapters").delete().in("id", [rowAId, rowBId, rowDraftId].filter(Boolean));
+  // Slug-pattern delete, not an id-list delete: the suite also creates a
+  // "Dupe" row and a cross-cluster row on failure paths whose assertions
+  // exist to catch exactly that leak. Every fixture slug in this file ends
+  // with `-${stamp}`, so this reaps all of them, including rows that only
+  // exist when an assertion above failed.
+  await admin.from("chapters").delete().like("slug", `%-${stamp}`);
   await admin.from("admins").delete().in("user_id", [pyhId, chId].filter(Boolean));
   if (pyhId) await admin.auth.admin.deleteUser(pyhId);
   if (chId) await admin.auth.admin.deleteUser(chId);

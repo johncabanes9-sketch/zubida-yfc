@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createChapter, deleteChapter, updateChapter } from "../actions";
+import { publicUrl } from "@/lib/images/paths";
+import {
+  createChapter,
+  deleteChapter,
+  removeChapterCover,
+  updateChapter,
+  uploadChapterCover,
+} from "../actions";
 
 const field =
   "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
@@ -18,6 +26,7 @@ export type ChapterListItem = {
   is_published: boolean;
   cluster_id: string;
   cluster_name: string | null;
+  cover_path: string | null;
 };
 
 type Cluster = { id: string; name: string };
@@ -164,6 +173,7 @@ export function ChapterAdmin({
                     onSubmit={(formData) =>
                       run(() => updateChapter(c.id, formData), "Chapter saved.", () => setEditingId(null))
                     }
+                    onRun={run}
                   />
                 </div>
               )}
@@ -182,6 +192,7 @@ function ChapterFields({
   submitLabel,
   onCancel,
   onSubmit,
+  onRun,
 }: {
   chapter?: ChapterListItem;
   clusters?: Cluster[];
@@ -189,6 +200,7 @@ function ChapterFields({
   submitLabel: string;
   onCancel: () => void;
   onSubmit: (formData: FormData) => void;
+  onRun?: (fn: () => Promise<{ error?: string }>, okText: string) => void;
 }) {
   return (
     <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
@@ -241,6 +253,10 @@ function ChapterFields({
         </label>
       )}
 
+      {chapter && onRun && (
+        <CoverField chapterId={chapter.id} coverPath={chapter.cover_path} pending={pending} onRun={onRun} />
+      )}
+
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {submitLabel}
@@ -250,5 +266,79 @@ function ChapterFields({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Cover image control for an existing chapter. Follows ImageField in
+ * page-editor.tsx: uploading replaces the current cover and reaps the old
+ * object; removing deletes the object before clearing the reference. There
+ * is no placeholder graphic — a chapter with no cover renders without one.
+ */
+function CoverField({
+  chapterId,
+  coverPath,
+  pending,
+  onRun,
+}: {
+  chapterId: string;
+  coverPath: string | null;
+  pending: boolean;
+  onRun: (fn: () => Promise<{ error?: string }>, okText: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const src = coverPath ? publicUrl(coverPath) : null;
+
+  return (
+    <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
+      <span className={label}>Cover image</span>
+
+      {src ? (
+        <div className="mt-3 grid gap-3">
+          <div className="relative h-40 w-full max-w-sm overflow-hidden rounded-lg">
+            <Image src={src} alt="" fill className="object-cover" />
+          </div>
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm("Remove this cover image? The uploaded file is deleted too.")) return;
+                onRun(() => removeChapterCover(chapterId), "Cover image removed.");
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Remove image
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted">
+          No cover image. The chapter card renders without one — better than a stand-in photo.
+        </p>
+      )}
+
+      <div className="mt-4">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="text-sm"
+          disabled={pending}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const fd = new FormData();
+            fd.append("cover", file);
+            onRun(() => uploadChapterCover(chapterId, fd), "Cover image uploaded.");
+            if (inputRef.current) inputRef.current.value = "";
+          }}
+        />
+        <p className="mt-1 text-xs text-muted">
+          Uploading replaces the current cover and deletes the old file.
+        </p>
+      </div>
+    </div>
   );
 }
