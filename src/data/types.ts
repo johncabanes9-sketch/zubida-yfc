@@ -1,21 +1,3 @@
-export type LeaderCategory =
-  | "Provincial Coordinator"
-  | "Provincial Couple Coordinators"
-  | "Area Heads"
-  | "Chapter Heads"
-  | "Core Group Leaders";
-
-export interface Leader {
-  id: string;
-  name: string;
-  position: string;
-  category: LeaderCategory;
-  chapter: string;
-  message: string;
-  photo: string;
-  socials?: { facebook?: string; instagram?: string };
-}
-
 export type EventStatus = "Open" | "Closed" | "Finished";
 export type EventScope = "Provincial" | "Chapter";
 

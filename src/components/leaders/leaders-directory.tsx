@@ -2,28 +2,25 @@
 
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, UserX } from "lucide-react";
-import { leaders } from "@/data/leaders";
-import type { LeaderCategory } from "@/data/types";
+import type { PublicLeader } from "@/lib/data/leaders";
 import { LeaderCard } from "@/components/shared/leader-card";
-import { cn } from "@/lib/utils";
 
-const categories: (LeaderCategory | "All")[] = [
-  "All",
-  "Provincial Coordinator",
-  "Provincial Couple Coordinators",
-  "Area Heads",
-  "Chapter Heads",
-  "Core Group Leaders",
-];
-
-export function LeadersDirectory() {
+export function LeadersDirectory({ leaders }: { leaders: PublicLeader[] }) {
   const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<(typeof categories)[number]>("All");
   const [chapter, setChapter] = useState("All");
 
   const chapters = useMemo(
-    () => ["All", ...Array.from(new Set(leaders.map((l) => l.chapter)))],
-    [],
+    () => [
+      "All",
+      ...Array.from(
+        new Set(
+          leaders
+            .map((l) => l.chapterName)
+            .filter((name): name is string => name !== null),
+        ),
+      ),
+    ],
+    [leaders],
   );
 
   const filtered = useMemo(() => {
@@ -33,12 +30,11 @@ export function LeadersDirectory() {
         !q ||
         l.name.toLowerCase().includes(q) ||
         l.position.toLowerCase().includes(q) ||
-        l.chapter.toLowerCase().includes(q);
-      const matchesCat = cat === "All" || l.category === cat;
-      const matchesChapter = chapter === "All" || l.chapter === chapter;
-      return matchesQ && matchesCat && matchesChapter;
+        (l.chapterName?.toLowerCase().includes(q) ?? false);
+      const matchesChapter = chapter === "All" || l.chapterName === chapter;
+      return matchesQ && matchesChapter;
     });
-  }, [query, cat, chapter]);
+  }, [leaders, query, chapter]);
 
   return (
     <div>
@@ -68,23 +64,6 @@ export function LeadersDirectory() {
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
-                cat === c
-                  ? "bg-dawn-soft text-white shadow-soft"
-                  : "bg-royal-700/8 text-muted hover:bg-royal-700/15 dark:bg-white/5",
-              )}
-            >
-              {c}
-            </button>
-          ))}
         </div>
       </div>
 
