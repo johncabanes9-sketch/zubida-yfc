@@ -144,8 +144,13 @@ check("a cluster head CANNOT move a leader into another cluster",
 const foreignInsert = await headClient.from("leaders").insert({
   name: "Foreign Insert", slug: `foreign-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", cluster_id: clusterB.id }).select("id");
+// An error alone would also be satisfied by a slug collision, a not-null
+// violation, or a typo'd column. The service-role re-read on a fixed name is
+// what makes this an assertion about the policy.
+const foreignInserted = await admin.from("leaders").select("id").eq("name", "Foreign Insert");
 check("a cluster head CANNOT create a leader in another cluster",
-  !!foreignInsert.error, foreignInsert.data);
+  !!foreignInsert.error && (foreignInserted.data?.length ?? -1) === 0,
+  { error: foreignInsert.error?.message, stored: foreignInserted.data });
 
 // Provincial-level rows have cluster_id null. `null = uuid` is null, not true,
 // so the cluster-head policy never matches them.
@@ -154,8 +159,11 @@ const provincial = await admin.from("leaders").insert({
   position: "Provincial Fixture" }).select("id").maybeSingle();
 const provEdit = await headClient.from("leaders")
   .update({ position: "Edited Provincial" }).eq("id", provincial.data.id).select("id");
+const provAfter = await admin.from("leaders")
+  .select("position").eq("id", provincial.data.id).maybeSingle();
 check("a cluster head CANNOT edit a provincial-level leader",
-  (provEdit.data?.length ?? 0) === 0, provEdit.data);
+  (provEdit.data?.length ?? -1) === 0 && provAfter.data?.position === "Provincial Fixture",
+  { affected: provEdit.data?.length, position: provAfter.data?.position });
 
 const pyhEdit = await pyhClient.from("leaders")
   .update({ position: "Edited By PYH" }).eq("id", provincial.data.id).select("id");
@@ -205,8 +213,27 @@ check("a cluster head CANNOT escalate by pointing a leader at another cluster's 
 const escalateBlind = await headClient.from("leaders").insert({
   name: "Escalation Probe Blind", slug: `escb-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", chapter_id: chapterInB.data.id }).select("id");
+const escalatedBlind = await admin.from("leaders").select("id").eq("name", "Escalation Probe Blind");
 check("a cluster head CANNOT create a leader in another cluster's chapter without naming a cluster",
-  !!escalateBlind.error, escalateBlind.data);
+  !!escalateBlind.error && (escalatedBlind.data?.length ?? -1) === 0,
+  { error: escalateBlind.error?.message, stored: escalatedBlind.data });
+
+// The UPDATE half of the same vector. leaders_derive_cluster fires on update
+// too, so the escalation is reachable by editing an existing in-cluster row
+// rather than creating one: USING matches rowA while it is still in cluster A,
+// the trigger then derives cluster B from the new chapter_id, and WITH CHECK
+// has to deny on the derived value. Re-reading both columns is the point --
+// an error that left chapter_id rewritten would be an escalation that merely
+// reported itself.
+const escalateUpdate = await headClient.from("leaders")
+  .update({ chapter_id: chapterInB.data.id }).eq("id", rowA).select("id");
+const rowAAfter = await admin.from("leaders")
+  .select("cluster_id, chapter_id").eq("id", rowA).maybeSingle();
+check("a cluster head CANNOT escalate by moving a leader onto another cluster's chapter",
+  !!escalateUpdate.error
+    && rowAAfter.data?.cluster_id === clusterA.id
+    && rowAAfter.data?.chapter_id === null,
+  { error: escalateUpdate.error?.message, stored: rowAAfter.data });
 
 // The trigger still has to work for the legitimate case.
 const chapterInA = await admin.from("chapters").insert({
