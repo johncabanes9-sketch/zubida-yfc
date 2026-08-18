@@ -430,7 +430,11 @@ check("a chapter cannot be hard-deleted while a leader points at it",
   !!restricted.error, restricted.data);
 ```
 
-Extend the Cleanup block to remove everything this task created:
+Extend the Cleanup block to remove everything this task created. **Insert this at
+the TOP of the Cleanup block**, before Task 1's single-row delete and before the
+"left no leaders behind" assertion — Tasks 3, 5, and 6 add rows that rely on this
+blanket delete, and the FK `consent_by -> auth.users(id)` means the leaders delete
+must precede `deleteUser`:
 
 ```javascript
 await admin.from("leaders").delete().not("id", "is", null);
@@ -940,10 +944,21 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
   // cluster_id is sent ONLY for provincial-level rows. When a chapter is chosen
   // the trigger derives it, and sending both invites the two to disagree.
   const cluster_id = chapter_id ? undefined : ctx.clusterId;
-  if (!chapter_id && !cluster_id && !ctx.isPyh) {
+  if (!chapter_id && !cluster_id && !ctx.isPYH) {
     return { error: "Choose a chapter, or ask the provincial youth head to add a provincial-level leader." };
   }
-  await requireClusterAccess(cluster_id ?? null);
+
+  // The guard needs a real cluster to compare against. `cluster_id` is
+  // deliberately undefined on the chapter path, and requireClusterAccess()
+  // redirects a non-PYH on a null argument (admin-auth.ts:72) — passing
+  // `cluster_id ?? null` would bounce a cluster head adding a leader to their
+  // OWN chapter. Look the chapter's cluster up for the guard; the trigger still
+  // owns what is actually stored.
+  const db = createServiceClient();
+  const guardCluster = chapter_id
+    ? (await db.from("chapters").select("cluster_id").eq("id", chapter_id).maybeSingle()).data?.cluster_id ?? null
+    : cluster_id ?? null;
+  await requireClusterAccess(guardCluster);
 
   // message and consent move together: the CHECK rejects any statement that
   // sets a quote without a recorded basis for publishing it.
@@ -951,7 +966,6 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
     ? { consent_at: new Date().toISOString(), consent_by: ctx.userId }
     : {};
 
-  const db = createServiceClient();
   const { data, error } = await db.from("leaders").insert({
     name: parsed.data.name,
     slug: slugFor(parsed.data.name),
@@ -1052,20 +1066,29 @@ console.log("\n── Photo action statement order (source-level) ──");
 // leaves the page pointing at an object that no longer exists.
 const src = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
 const body = (fn) => src.slice(src.indexOf(`export async function ${fn}`));
+// `-1 < -1` is false, but `indexOf` returning -1 for the FIRST operand and a
+// real index for the second still compares "correctly" — a vacuous pass. This
+// is the exact defect 1b8301e had to close in the chapters slice. Both indices
+// must be real before the ordering means anything.
+const orderedBefore = (hay, first, second) => {
+  const a = hay.indexOf(first), b = hay.indexOf(second);
+  return a >= 0 && b >= 0 && a < b;
+};
+
 const upload = body("uploadLeaderPhoto");
 check("uploadLeaderPhoto updates photo_path before reaping the replaced photo",
-  upload.indexOf("photo_path") < upload.indexOf("reapPaths"), null);
+  orderedBefore(upload, "photo_path", "reapPaths"), null);
 const remove = body("removeLeaderPhoto");
 check("removeLeaderPhoto reaps the photo before clearing photo_path",
-  remove.indexOf("reapPaths") < remove.indexOf("photo_path"), null);
-const withdraw = body("withdrawConsent");
-check("withdrawConsent clears message and consent in the same update as photo_path",
-  /update\(\{[^}]*photo_path[^}]*message[^}]*consent_at/s.test(withdraw), null);
-```
+  orderedBefore(remove, "reapPaths", "photo_path"), null);
 
-Guard against the vacuous form that Task 6 of the chapters slice shipped and
-`1b8301e` had to close: if `indexOf` returns `-1` for both operands the
-comparison is still `true`. Assert both indices are `>= 0` in each check.
+// Order-independent on purpose: the three fields must land in ONE update() call,
+// but which order the implementer writes them in is not a correctness property.
+const withdraw = body("withdrawConsent");
+const withdrawUpdate = withdraw.match(/update\(\{[\s\S]*?\}\)/)?.[0] ?? "";
+check("withdrawConsent clears photo_path, message, and consent in ONE update",
+  ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
+  withdrawUpdate.slice(0, 120));
 
 - [ ] **Step 2: Run tests to verify they fail**
 
