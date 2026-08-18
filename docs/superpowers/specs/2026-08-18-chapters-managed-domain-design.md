@@ -159,7 +159,9 @@ condition changes. A visitor sees no difference until real chapters are publishe
 
 `ChaptersExplorer` is re-typed from the fixture `Chapter` to the database row.
 
-## Content rule
+## Content rule: real numbers only, real information only
+
+This is the binding constraint on the slice, not a preference.
 
 **The table ships empty.** The migration creates the table and its policies and
 seeds nothing. The twelve fixture chapters are invented — invented coordinators,
@@ -167,6 +169,33 @@ invented schedules, invented member counts, `picsum.photos` covers — and must 
 be migrated into a table that the public site reads as fact.
 
 `src/data/chapters.ts` is deleted and `"chapters"` is removed from `FixtureDomain`.
+
+Three mechanisms enforce this rather than leaving it to good intentions:
+
+1. **Nullable by design.** `schedule`, `coordinator` and `cover_path` are nullable
+   so a chapter can be published with a field genuinely absent. Withholding must
+   be representable in the schema, or the schema itself pressures someone to fill
+   the gap with something plausible.
+2. **No default content anywhere.** Unlike `page_sections`, whose registry entries
+   carry `defaultContent`, a new chapter starts with empty optional fields. The
+   `text-image` section already sets this precedent in the registry: *"No default
+   image: seeding a stock placeholder is how stand-in imagery ends up published
+   as though it depicted the organization."*
+3. **Asserted, not assumed.** `prove:chapters` asserts the migration inserts zero
+   chapter rows, and `prove:content` asserts no `picsum.photos` or `i.pravatar.cc`
+   URL can reach a chapter record. A future seed that "makes the page look
+   finished" fails the suite.
+
+### On `memberCount`
+
+Excluded because no real figures exist for it, and an empty column on a public
+page is a standing invitation to fill it with a plausible one — the same pressure
+that produced the "26 chapters" claim the content audit had to remove.
+
+If the organization supplies real per-chapter numbers, the column is added then,
+nullable, and published only where a real figure exists. The rule does not change
+in that case; only the availability of data does. The same applies to `upcoming`,
+which should be a query against real `events` rows if it returns at all.
 
 ## Testing
 
@@ -185,6 +214,11 @@ Coverage:
 5. **Image lifecycle** — replacing a cover reaps the old object; deleting a
    chapter reaps its cover.
 6. **Slug uniqueness** — enforced by the database, not only the form.
+7. **No fabricated data can enter** — the migration inserts zero chapter rows, and
+   no chapter record may carry a `picsum.photos` or `i.pravatar.cc` URL. This is
+   the "real numbers only, real information only" rule made executable, so a later
+   seed intended to make the page look finished fails the suite instead of
+   shipping.
 
 `prove:content` gains assertions that `src/data/chapters.ts` is gone and that
 `"chapters"` no longer appears in `FixtureDomain`.
