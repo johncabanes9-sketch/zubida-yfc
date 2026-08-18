@@ -405,8 +405,13 @@ check("clearing consent together with the photo and quote succeeds",
 
 console.log("\n── Photo action statement order (source-level) ──");
 
-// Order matters: reap after the row is updated, or a crash between the two
-// leaves the page pointing at an object that no longer exists.
+// Order matters, but the direction flips depending on which side of the
+// write is disposable. On a REPLACE (upload), the row must point at the NEW
+// object before the OLD one is reaped -- a crash between them must not leave
+// the page pointing at bytes that are already gone. On a REMOVE or a
+// WITHDRAWAL, the object must be reaped BEFORE the row stops pointing at it
+// -- a crash between them must not orphan the file with nothing left that
+// can find it to delete it later.
 const src = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
 // Bounded at the NEXT function declaration (or EOF for the last function) —
 // an unbounded slice(start) runs to the end of the file, so a later
@@ -438,9 +443,17 @@ const remove = body("removeLeaderPhoto");
 check("removeLeaderPhoto reaps the photo before clearing photo_path",
   orderedBefore(remove, "reapPaths(", "photo_path: null"), null);
 
+const withdraw = body("withdrawConsent");
+// Same rule as removeLeaderPhoto, and the fix this guards: withdrawConsent
+// originally updated the row first and reaped after, swallowing reapPaths()'s
+// error -- a failed removal still reported withdrawal as successful. Nothing
+// else in this suite would catch that regression; the one-update check just
+// below stays green either way.
+check("withdrawConsent reaps the photo before clearing consent",
+  orderedBefore(withdraw, "reapPaths(", "photo_path: null"), null);
+
 // Order-independent on purpose: the three fields must land in ONE update() call,
 // but which order the implementer writes them in is not a correctness property.
-const withdraw = body("withdrawConsent");
 const withdrawUpdate = withdraw.match(/update\(\{[\s\S]*?\}\)/)?.[0] ?? "";
 check("withdrawConsent clears photo_path, message, and consent in ONE update",
   ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
