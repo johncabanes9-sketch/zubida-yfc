@@ -15,7 +15,8 @@
     "prove:uploads": "node --experimental-strip-types scripts/prove-uploads.mjs",
     "prove:pages": "node --experimental-strip-types scripts/prove-pages.mjs",
     "prove:content": "node --experimental-strip-types scripts/prove-content.mjs",
-    "prove:editor": "node scripts/prove-editor.mjs"
+    "prove:editor": "node scripts/prove-editor.mjs",
+    "prove:chapters": "node scripts/prove-chapters.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
