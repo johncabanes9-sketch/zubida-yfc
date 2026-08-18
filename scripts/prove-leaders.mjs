@@ -408,7 +408,15 @@ console.log("\n── Photo action statement order (source-level) ──");
 // Order matters: reap after the row is updated, or a crash between the two
 // leaves the page pointing at an object that no longer exists.
 const src = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
-const body = (fn) => src.slice(src.indexOf(`export async function ${fn}`));
+// Bounded at the NEXT function declaration (or EOF for the last function) —
+// an unbounded slice(start) runs to the end of the file, so a later
+// function's text can silently supply the token this function's own body
+// never contained.
+const body = (fn) => {
+  const start = src.indexOf(`export async function ${fn}`);
+  const next = src.indexOf("\nexport async function", start + 1);
+  return src.slice(start, next === -1 ? src.length : next);
+};
 // `-1 < -1` is false, but `indexOf` returning -1 for the FIRST operand and a
 // real index for the second still compares "correctly" — a vacuous pass. This
 // is the exact defect 1b8301e had to close in the chapters slice. Both indices
@@ -418,12 +426,17 @@ const orderedBefore = (hay, first, second) => {
   return a >= 0 && b >= 0 && a < b;
 };
 
+// Anchored on the actual statements (the update() object key and the reap
+// call), not the bare word "photo_path" — a pre-authorization
+// `.select("...photo_path")` or a comment mentioning either word would
+// satisfy a bare-word match without the real statements being ordered at
+// all. This is what 1b8301e's own fix looked like once applied for real.
 const upload = body("uploadLeaderPhoto");
 check("uploadLeaderPhoto updates photo_path before reaping the replaced photo",
-  orderedBefore(upload, "photo_path", "reapPaths"), null);
+  orderedBefore(upload, "photo_path: key", "reapPaths("), null);
 const remove = body("removeLeaderPhoto");
 check("removeLeaderPhoto reaps the photo before clearing photo_path",
-  orderedBefore(remove, "reapPaths", "photo_path"), null);
+  orderedBefore(remove, "reapPaths(", "photo_path: null"), null);
 
 // Order-independent on purpose: the three fields must land in ONE update() call,
 // but which order the implementer writes them in is not a correctness property.
