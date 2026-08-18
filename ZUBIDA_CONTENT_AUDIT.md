@@ -131,6 +131,33 @@ Rendered from `page_sections` (DB) with `src/lib/pages/fallback.ts` mirroring it
 | Leader social links | `"#"` on every entry | **BUG — dead placeholder links** | renders clickable icons that go nowhere |
 | Page header copy | hardcoded `leaders/page.tsx` | UNVERIFIED | |
 
+**RESOLVED — the leadership managed domain** *(2026-08-18)*. Every row above is
+gone rather than corrected. `src/data/leaders.ts`, the `Leader` interface, and
+the invented `LeaderCategory` taxonomy were deleted, including the fabricated
+clergy attribution to "Rev. Fr. Emmanuel Sarabia, Provincial Spiritual
+Director." `leaders` is now a database table with cluster-scoped RLS
+(migrations 0025 and 0026) that ships **empty**, and `/leaders` renders a
+withholding notice until an administrator publishes a real leader. The `"#"`
+placeholder social links are unrepresentable in the new schema: `facebook_url`
+and `instagram_url` are nullable and constrained to `https://` at both the
+database (`CHECK`) and the Zod validation layer. A photo or a personal quote
+additionally cannot be stored without a recorded consent basis — `consent_at`
+and `consent_by` — enforced by the
+`leaders_personal_content_requires_consent` `CHECK` constraint, not by a
+render-time filter. Verified by `npm run prove:leaders` (50 assertions), which
+includes an escalation probe proving the `cluster_id`-derivation trigger
+cannot be used to write into another cluster.
+
+**Known limitation, not a defect:** the schema records one consent pair
+(`consent_at`/`consent_by`) for two content fields (`photo_path` and
+`message`). This is a deliberate simplification the design document accepts
+explicitly (see "Granularity" in
+`docs/superpowers/specs/2026-08-18-leaders-managed-domain-design.md`).
+Its consequence: uploading a photo re-stamps the consent basis recorded for an
+existing, untouched quote, and vice versa. The fix, if the organization needs
+to distinguish the two bases, is to split into `photo_consent_*` /
+`message_consent_*` column pairs — a schema change, not an application bug.
+
 ### 2.5 Chapters (`/chapters`)
 
 | Information | Source | Accurate? | Notes |

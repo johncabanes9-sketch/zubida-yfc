@@ -1,7 +1,7 @@
 # Leaders as a Managed Domain
 
 **Date:** 2026-08-18
-**Status:** Approved, not yet implemented
+**Status:** Implemented 2026-08-18 — 50 assertions (`npm run prove:leaders`)
 **Slice:** Second of the deferred content slice (chapters ✅, **leaders**, news, gallery, testimonials, FAQ)
 **Precedent:** `2026-08-18-chapters-managed-domain-design.md` — implemented, 33 assertions
 
@@ -191,6 +191,14 @@ as a cluster head and requires it to fail — and then drops the policy and conf
 assertion passes, to prove the assertion is not vacuous. If the ordering turns out to run the
 other way, the fallback is to reject the mismatch outright with a `CHECK` against a lookup
 function instead of silently deriving it.
+
+**Outcome: the assumption held.** RLS `WITH CHECK` is evaluated after the `BEFORE` trigger has
+rewritten the row, on this Postgres/Supabase stack. The escalation probe — insert, blind
+insert, and update variants, in `npm run prove:leaders` under "The trigger must not become an
+escalation path" — fails the write in every form tried, and the policy-dropped negative control
+confirmed the assertion is discriminating rather than vacuous. The `BEFORE` trigger deriving
+`cluster_id` from `chapter_id` is therefore the design that shipped in `0026_leaders_rls.sql`.
+The documented `CHECK`-against-a-lookup-function fallback was **not** needed and was not built.
 
 ## Public page
 

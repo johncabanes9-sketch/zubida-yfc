@@ -31,6 +31,9 @@ a real database, an authenticated admin surface, and a page CMS.
   replace images. Replaced images are reaped from storage rather than orphaned.
 - Chapters directory — cluster heads manage their own cluster's chapters, the
   provincial youth head manages all. Entered as drafts and published per row.
+- Leadership directory — cluster heads manage their own cluster's leaders, the
+  provincial youth head manages all. A photo or a personal quote cannot be stored
+  without a recorded consent basis.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -45,7 +48,7 @@ reach a public page until it is marked verified. Chapters no longer sit there �
 they are a managed database domain, and `/chapters` renders the empty-state
 notice until an administrator publishes a real one.
 
-`npm run prove:content` enforces this: 93 assertions covering identity
+`npm run prove:content` enforces this: 95 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Tech Stack
@@ -73,7 +76,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 93 assertions — the only suite that needs no database
+npm run prove:content      # 95 assertions — the only suite that needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
@@ -81,6 +84,7 @@ npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
 npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
+npm run prove:leaders      # 50 — the leadership directory, RLS and consent
 ```
 
 CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.
@@ -125,6 +129,6 @@ src/
     data/           database reads with outage fallbacks
     rbac.ts validation/ email/ qr.ts constants.ts utils.ts
   middleware.ts     session refresh, 30-min idle timeout, admin route protection
-supabase/migrations/   25 ordered .sql migrations
+supabase/migrations/   27 ordered .sql migrations
 scripts/               db:migrate and the prove:* suites
 ```
