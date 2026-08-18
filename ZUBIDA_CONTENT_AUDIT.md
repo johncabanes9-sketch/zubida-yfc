@@ -277,13 +277,34 @@ four hardcoded numbers, and the `/chapters` header no longer claims a count. The
 `stats` export in `src/data/stats.ts` is now imported by nothing; it survives only
 as the shape reference the fixtures gate documents.
 
-**STILL OPEN — the figure is reachable through two fallback paths.** "With 26
-chapters and thousands of members" is hardcoded in `DEFAULT_MILESTONES`
-(`src/components/about/timeline.tsx:13`) and again in `PAGE_FALLBACK`
-(`src/lib/pages/fallback.ts:19`), which `src/lib/data/pages.ts` serves when the
-database is unreachable. A DB outage therefore publishes a fabricated count on
-`/about`. The `/news` excerpt still carries it too, but is withheld by the
-`news: false` gate. Neither is covered by an assertion.
+**RESOLVED — the last unrendered copy of the figure** *(2026-08-18)*. An earlier
+draft of this note claimed the figure was reachable on a database outage. That was
+wrong, and the correction belongs in the record: `PAGE_FALLBACK.about` does **not**
+contain it. The fabricated timeline lives in `UNVERIFIED_ABOUT_HISTORY`
+(`src/lib/pages/fallback.ts:17`), which is exported and referenced by nothing —
+deliberately retained so an administrator can correct the copy rather than rewrite
+it from nothing. `prove:content` §2 has covered the outage path all along: "About
+fallback renders no unverified history timeline" and "About fallback states no
+unverified chapter count".
+
+The real exposure was narrower, and had no assertion.
+`src/components/about/timeline.tsx` carried the same six milestones as a **default
+parameter** (`milestones = DEFAULT_MILESTONES`). It was unreachable through the only
+caller — `TimelineSection` always passes `content.milestones`, and `timelineSchema`
+requires `.min(1)` — but any future caller that omitted the prop would have published
+six invented milestones, the "26 chapters" figure among them, without an edit to the
+database or the fallback. Silent, and invisible to every existing check.
+
+`milestones` is now a **required** prop and the default is deleted; `tsc` passing
+confirms no caller depended on it. Two assertions were added RED-first: "the timeline
+component supplies no default milestones" and "the timeline component asserts no
+chapter count of its own".
+
+**Still withheld, not resolved:** the `/news` n1 excerpt ("filling fast across all 26
+chapters") still carries the figure in `src/data/news.ts`. It reaches no page — the
+`news: false` fixture gate withholds it — and it is corrected when the news domain
+moves to a managed table, not before.
+
 ---
 
 ## 6. Images and media

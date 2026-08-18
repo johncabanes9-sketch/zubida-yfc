@@ -123,6 +123,25 @@ check(
   null,
 );
 
+// The fallback is not the only way invented history could reach a page. The
+// Timeline component carried the same six milestones as a DEFAULT parameter, so
+// any caller that omitted the prop would publish them — including the retired
+// "26 chapters" figure — without touching the database or the fallback. The
+// section renderer always passes content.milestones today, which is exactly why
+// the default was invisible. A required prop makes the omission a build error
+// instead of a silent republication.
+const timelineComponent = code("src/components/about/timeline.tsx");
+check(
+  "the timeline component supplies no default milestones",
+  !/milestones\s*=\s*[A-Za-z_$]/.test(timelineComponent),
+  null,
+);
+check(
+  "the timeline component asserts no chapter count of its own",
+  !/twenty-six chapters|26 chapters/i.test(timelineComponent),
+  null,
+);
+
 // Migration 0017 must actually withhold the same things in the database.
 const m17 = read("supabase/migrations/0017_about_unverified_content.sql");
 check("migration 0017 hides the timeline section", /type = 'timeline'[\s\S]*visible = false|visible = false[\s\S]*type = 'timeline'/.test(m17), null);

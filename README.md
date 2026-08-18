@@ -45,7 +45,7 @@ reach a public page until it is marked verified. Chapters no longer sit there �
 they are a managed database domain, and `/chapters` renders the empty-state
 notice until an administrator publishes a real one.
 
-`npm run prove:content` enforces this: 91 assertions covering identity
+`npm run prove:content` enforces this: 93 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Tech Stack
@@ -73,7 +73,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 91 assertions — the only suite that needs no database
+npm run prove:content      # 93 assertions — the only suite that needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
