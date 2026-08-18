@@ -486,8 +486,16 @@ console.log("\n── Cleanup ──");
 // to reach, and the FK consent_by -> auth.users(id) means every leader row must
 // be gone before deleteUser can succeed.
 await admin.from("leaders").delete().not("id", "is", null);
-await admin.from("chapters").delete().in("id",
-  [chapterInA.data?.id, chapterInB.data?.id].filter(Boolean));
+// Matched on the fixture pattern, not the captured ids: an interrupted run
+// (this slice's policy-mutation testing hit that repeatedly) never reaches
+// this line, so ids captured in THIS run cannot sweep up rows a PRIOR
+// interrupted run left behind. Those orphans then poison prove:chapters,
+// which asserts the migration seeds zero chapter rows. Matching on the
+// fixture's own name/slug pattern instead lets any run self-heal whatever a
+// previous run left -- mirroring the leaders blanket delete above, which
+// already self-heals this way.
+await admin.from("chapters").delete()
+  .like("slug", "suite-ch-%").like("name", "Suite Chapter In%");
 await admin.from("admins").delete().in("user_id", [headId, pyhId]);
 await admin.auth.admin.deleteUser(headId);
 await admin.auth.admin.deleteUser(pyhId);
@@ -498,6 +506,12 @@ if (plain.data?.id) await admin.from("leaders").delete().eq("id", plain.data.id)
 const leftover = await admin.from("leaders").select("id");
 check("the suite left no leaders behind",
   !leftover.error && (leftover.data?.length ?? -1) === 0, leftover.data);
+
+const leftoverChapters = await admin.from("chapters")
+  .select("id").like("slug", "suite-ch-%");
+check("the suite left no chapter fixtures behind",
+  !leftoverChapters.error && (leftoverChapters.data?.length ?? -1) === 0,
+  leftoverChapters.error?.message ?? leftoverChapters.data);
 
 console.log("─".repeat(48));
 console.log(`${pass} passed, ${fail} failed`);
