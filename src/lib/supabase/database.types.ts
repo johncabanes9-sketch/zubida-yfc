@@ -66,6 +66,27 @@ export interface ChapterRow {
   deleted_at: string | null;
 }
 
+export interface LeaderRow {
+  id: string;
+  name: string;
+  slug: string;
+  position: string;
+  chapter_id: string | null;
+  cluster_id: string | null;
+  message: string | null;
+  photo_path: string | null;
+  consent_at: string | null;
+  consent_by: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  is_published: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+}
+
 export interface AdminRow {
   id: string;
   user_id: string;
@@ -98,6 +119,7 @@ export interface Database {
       >;
       admins: Table<AdminRow, Partial<AdminRow>, Partial<AdminRow>>;
       chapters: Table<ChapterRow, Partial<ChapterRow>, Partial<ChapterRow>>;
+      leaders: Table<LeaderRow, Partial<LeaderRow>, Partial<LeaderRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
     };
     Views: Record<string, never>;
