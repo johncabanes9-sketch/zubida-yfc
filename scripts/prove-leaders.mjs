@@ -226,6 +226,57 @@ const restricted = await admin.from("chapters").delete().eq("id", chapterInA.dat
 check("a chapter cannot be hard-deleted while a leader points at it",
   !!restricted.error, restricted.data);
 
+console.log("\n── The public sees only what was published ──");
+
+// No sign-in. This is the client the website itself uses, and leaders_public_read
+// is the only policy standing between an unpublished draft and the open web.
+const publicClient = createClient(url, anon, { auth: { persistSession: false } });
+
+const mkPublicFixture = async (name, fields) => {
+  const r = await admin.from("leaders").insert({
+    name, slug: `pub-${crypto.randomUUID().slice(0, 8)}`, position: "Public Fixture",
+    cluster_id: clusterA.id, ...fields }).select("id").maybeSingle();
+  if (r.error) { console.error("public fixture failed:", r.error.message); process.exit(1); }
+  return r.data.id;
+};
+const livePublished = await mkPublicFixture("Public Live", { is_published: true });
+const draftRow = await mkPublicFixture("Public Draft", { is_published: false });
+const softDeleted = await mkPublicFixture("Public Soft Deleted",
+  { is_published: true, deleted_at: new Date().toISOString() });
+
+const anonLive = await publicClient.from("leaders").select("id").eq("id", livePublished);
+check("an anonymous reader sees a published, undeleted leader",
+  anonLive.data?.length === 1, anonLive.error?.message ?? anonLive.data);
+
+// `?? -1` rather than `?? 0`: an error would leave data null, and an assertion
+// that treats "the query blew up" as "the row was withheld" is not a test.
+const anonDraft = await publicClient.from("leaders").select("id").eq("id", draftRow);
+check("an anonymous reader does NOT see an unpublished draft",
+  (anonDraft.data?.length ?? -1) === 0, anonDraft.error?.message ?? anonDraft.data);
+
+const anonDeleted = await publicClient.from("leaders").select("id").eq("id", softDeleted);
+check("an anonymous reader does NOT see a soft-deleted leader",
+  (anonDeleted.data?.length ?? -1) === 0, anonDeleted.error?.message ?? anonDeleted.data);
+
+console.log("\n── updated_at is maintained by the database ──");
+
+// 0025 attached no set_updated_at trigger, so updated_at never moved after
+// insert and the column reported a last-changed time that was never true.
+const stampProbe = await admin.from("leaders").insert({
+  name: "Stamp Probe", slug: `stamp-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Probe" }).select("id, created_at, updated_at").maybeSingle();
+check("a fresh row starts with updated_at equal to created_at",
+  !!stampProbe.data && stampProbe.data.created_at === stampProbe.data.updated_at,
+  stampProbe.error?.message ?? stampProbe.data);
+
+await admin.from("leaders").update({ position: "Touched" }).eq("id", stampProbe.data.id);
+const touched = await admin.from("leaders")
+  .select("created_at, updated_at").eq("id", stampProbe.data.id).maybeSingle();
+// Ordering only. Nothing here depends on how long the update took.
+check("updated_at advances past created_at when the row is updated",
+  !!touched.data && new Date(touched.data.updated_at) > new Date(touched.data.created_at),
+  touched.error?.message ?? touched.data);
+
 console.log("\n── Cleanup ──");
 // Blanket delete first: the sections above (and later tasks) add rows this has
 // to reach, and the FK consent_by -> auth.users(id) means every leader row must

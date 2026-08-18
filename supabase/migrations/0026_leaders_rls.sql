@@ -74,3 +74,12 @@ drop policy if exists leaders_cluster_head_update on leaders;
 create policy leaders_cluster_head_update on leaders for update to authenticated
   using (cluster_id = admin_cluster(auth.uid()))
   with check (cluster_id = admin_cluster(auth.uid()));
+
+-- Every table since 0001_events.sql attaches set_updated_at(); 0025_leaders.sql
+-- did not, so updated_at never advanced past insert and the column quietly
+-- lied about when the row last changed. Same omission 0024_chapters_rls.sql
+-- had to correct for chapters.
+drop trigger if exists leaders_set_updated_at on leaders;
+create trigger leaders_set_updated_at
+  before update on leaders
+  for each row execute function set_updated_at();
