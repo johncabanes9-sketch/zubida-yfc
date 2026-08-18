@@ -223,6 +223,18 @@ try {
   const afterDelete = (await getChapters()).map((c) => c.id);
   check("a soft-deleted chapter leaves the public list", !afterDelete.includes(rowBId), afterDelete);
 
+  // getChapters() is contractually required to swallow any database error
+  // into [] (the no-fixture-fallback guarantee) — so on its own, the absence
+  // check above cannot tell "the deleted_at filter correctly excluded rowB"
+  // apart from "this call errored and returned []". A transient failure here
+  // would pass the absence assertion without ever exercising the filter.
+  // Pairing it with a presence assertion on the same afterDelete result closes
+  // that gap, the same way the cluster-head flip control two sections above
+  // proves the policy isn't just denying everything — don't remove this as
+  // "redundant" with the line above; it's what makes that line meaningful.
+  check("getChapters still returns other published chapters after the soft-delete",
+    afterDelete.includes(rowAId), afterDelete);
+
   const withoutCover = published.find((c) => c.id === rowAId);
   check("a chapter with no cover_path yields cover === null", withoutCover?.cover === null, withoutCover?.cover);
 } catch (e) {
