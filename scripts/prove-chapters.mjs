@@ -208,6 +208,23 @@ try {
   const pyhWriteB = await pyh.from("chapters").update({ municipality: "Edited by PYH" }).eq("id", rowBId).select("municipality");
   check("the PYH CAN edit any cluster's chapter",
     pyhWriteB.data?.[0]?.municipality === "Edited by PYH", pyhWriteB.error?.message ?? pyhWriteB.data);
+
+  console.log("\n── Public data layer ──");
+
+  const { getChapters } = await import("../src/lib/data/chapters.ts");
+  const published = await getChapters();
+  const ids = published.map((c) => c.id);
+  check("getChapters returns published chapters", ids.includes(rowAId), ids);
+  check("getChapters omits drafts", !ids.includes(rowDraftId), ids);
+
+  const softDeleteB = await admin.from("chapters").update({ deleted_at: new Date().toISOString() }).eq("id", rowBId).select("id");
+  check("the soft-delete update on rowB succeeded",
+    !softDeleteB.error && softDeleteB.data?.length === 1, softDeleteB.error?.message ?? softDeleteB.data);
+  const afterDelete = (await getChapters()).map((c) => c.id);
+  check("a soft-deleted chapter leaves the public list", !afterDelete.includes(rowBId), afterDelete);
+
+  const withoutCover = published.find((c) => c.id === rowAId);
+  check("a chapter with no cover_path yields cover === null", withoutCover?.cover === null, withoutCover?.cover);
 } catch (e) {
   // Anything that threw above — fixture setup, or a guard between blocks.
   // Recorded rather than re-thrown so the cleanup below still runs on a live
