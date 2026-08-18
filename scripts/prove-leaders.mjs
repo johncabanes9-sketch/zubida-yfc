@@ -382,6 +382,57 @@ const dupSlug = await admin.from("leaders").insert({
   name: "Dup", slug: partial.data.slug, position: "Probe" }).select("id");
 check("the database rejects a duplicate slug", !!dupSlug.error, dupSlug.data);
 
+console.log("\n── Photos and consent withdrawal ──");
+
+const consented = await admin.from("leaders").insert({
+  name: "Photo Leader", slug: `photo-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Probe", photo_path: "leaders/probe/a.jpg",
+  consent_at: new Date().toISOString(), consent_by: pyhId })
+  .select("id").maybeSingle();
+check("a photo WITH consent recorded saves", !consented.error, consented.error?.message);
+
+// Withdrawal must be one statement. Clearing consent while the photo remains is
+// exactly the half-done state the constraint exists to forbid.
+const halfWithdraw = await admin.from("leaders")
+  .update({ consent_at: null, consent_by: null }).eq("id", consented.data.id).select("id");
+check("clearing consent while a photo remains is rejected", !!halfWithdraw.error, halfWithdraw.data);
+
+const fullWithdraw = await admin.from("leaders")
+  .update({ consent_at: null, consent_by: null, photo_path: null, message: null })
+  .eq("id", consented.data.id).select("id");
+check("clearing consent together with the photo and quote succeeds",
+  !fullWithdraw.error && fullWithdraw.data?.length === 1, fullWithdraw.error?.message);
+
+console.log("\n── Photo action statement order (source-level) ──");
+
+// Order matters: reap after the row is updated, or a crash between the two
+// leaves the page pointing at an object that no longer exists.
+const src = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
+const body = (fn) => src.slice(src.indexOf(`export async function ${fn}`));
+// `-1 < -1` is false, but `indexOf` returning -1 for the FIRST operand and a
+// real index for the second still compares "correctly" — a vacuous pass. This
+// is the exact defect 1b8301e had to close in the chapters slice. Both indices
+// must be real before the ordering means anything.
+const orderedBefore = (hay, first, second) => {
+  const a = hay.indexOf(first), b = hay.indexOf(second);
+  return a >= 0 && b >= 0 && a < b;
+};
+
+const upload = body("uploadLeaderPhoto");
+check("uploadLeaderPhoto updates photo_path before reaping the replaced photo",
+  orderedBefore(upload, "photo_path", "reapPaths"), null);
+const remove = body("removeLeaderPhoto");
+check("removeLeaderPhoto reaps the photo before clearing photo_path",
+  orderedBefore(remove, "reapPaths", "photo_path"), null);
+
+// Order-independent on purpose: the three fields must land in ONE update() call,
+// but which order the implementer writes them in is not a correctness property.
+const withdraw = body("withdrawConsent");
+const withdrawUpdate = withdraw.match(/update\(\{[\s\S]*?\}\)/)?.[0] ?? "";
+check("withdrawConsent clears photo_path, message, and consent in ONE update",
+  ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
+  withdrawUpdate.slice(0, 120));
+
 console.log("\n── Admin action guards (source-level) ──");
 
 const actions = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");

@@ -3,6 +3,9 @@ import { revalidatePath } from "next/cache";
 import { requireClusterAccess, createServerSupabase, loadAdminContext } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { leaderSchema } from "@/lib/validation/leader";
+import { validateImage } from "@/lib/images/validate";
+import { leaderImageKey } from "@/lib/leaders/paths";
+import { reapPaths } from "@/lib/pages/reap";
 import type { LeaderRow } from "@/lib/supabase/database.types";
 
 const slugify = (s: string) =>
@@ -123,9 +126,9 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
   await loadAdminContext();
   const db = createServiceClient();
   const { data: row } = await db.from("leaders")
-    .select("id, chapter_id, cluster_id, message, consent_at").eq("id", id).maybeSingle();
+    .select("id, chapter_id, cluster_id, message, photo_path, consent_at").eq("id", id).maybeSingle();
   if (!row) return { error: "Leader not found." };
-  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "consent_at">;
+  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "photo_path" | "consent_at">;
 
   // Authorize against the row's CURRENT scope before allowing any change. A
   // chapter-scoped row is guarded by ITS CHAPTER'S cluster (never null — a
@@ -154,12 +157,16 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
   // its ORIGINAL basis rather than being re-stamped: without this, an admin
   // who merely toggles "Published" on someone else's leader would silently
   // become consent_by, with consent_at moved to now -- naming a person who
-  // never actually obtained consent for that quote.
+  // never actually obtained consent for that quote. This form never touches
+  // photo_path, so when the quote is cleared and no photo already exists on
+  // the row, there is no personal content left for the basis to describe --
+  // clear it too, rather than leaving consent_at/consent_by dangling and
+  // naming a person for content that no longer exists.
   const consent = message
     ? (current.message === message && current.consent_at
         ? {} // unchanged quote keeps the basis originally recorded for it
         : { consent_at: new Date().toISOString(), consent_by: ctx.userId })
-    : {};
+    : (current.photo_path ? {} : { consent_at: null, consent_by: null });
 
   // The actual write goes through the RLS-respecting client — not the
   // service-role `db` used above for the pre-authorization reads — so the
@@ -219,5 +226,122 @@ export async function deleteLeader(id: string): Promise<{ error?: string }> {
   await audit(ctx.userId, "leader.delete", id);
   revalidatePath("/admin/leaders");
   revalidatePath("/leaders");
+  return {};
+}
+
+/** Cluster to authorize against for a row already on hand: its chapter's
+ * cluster when chapter-scoped, otherwise its own cluster_id (null for a
+ * provincial-level row, matching updateLeader/deleteLeader). */
+async function guardClusterFor(
+  db: ReturnType<typeof createServiceClient>,
+  leader: Pick<LeaderRow, "chapter_id" | "cluster_id">,
+) {
+  return leader.chapter_id
+    ? (await db.from("chapters").select("cluster_id").eq("id", leader.chapter_id).maybeSingle()).data?.cluster_id ?? null
+    : leader.cluster_id;
+}
+
+export async function uploadLeaderPhoto(id: string, formData: FormData): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, slug, photo_path").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "slug" | "photo_path">;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "No file selected." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const v = validateImage(bytes, file.size);
+  if (!v.ok) return { error: v.reason };
+
+  const key = leaderImageKey(leader.slug, v.mime);
+  const upl = await db.storage.from("media").upload(key, bytes, { contentType: v.mime, upsert: false });
+  if (upl.error) return { error: "Upload failed." };
+
+  // A new photo is new personal content, so consent is stamped fresh here —
+  // unlike updateLeader's unchanged-quote exception, there is no prior basis
+  // for THIS image to preserve. photo_path and the consent pair land in the
+  // SAME update(): the CHECK rejects any statement that separates them, so
+  // there is no "upload now, record consent later" path by construction.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    photo_path: key,
+    consent_at: new Date().toISOString(),
+    consent_by: ctx.userId,
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+  }).eq("id", id).select("id");
+  if (error || !data || data.length === 0) {
+    await db.storage.from("media").remove([key]);
+    return { error: error?.message ?? "Not permitted." };
+  }
+
+  // Reap the replaced photo last: the new one is already saved, so a failure
+  // here leaks bytes rather than losing the image the leader now points at.
+  if (leader.photo_path && leader.photo_path !== key) {
+    await reapPaths(db, [leader.photo_path]);
+  }
+  await audit(ctx.userId, "leader.photo", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
+  return {};
+}
+
+export async function removeLeaderPhoto(id: string): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders").select("*").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as LeaderRow;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  // Object first, then the reference — a failure leaves the row pointing at a
+  // file that still exists rather than orphaning bytes nobody references. An
+  // empty array is a no-op inside reapPaths, so a leader with no photo simply
+  // falls through to clearing a column that is already null.
+  const reap = await reapPaths(db, leader.photo_path ? [leader.photo_path] : []);
+  if (reap.error) return { error: reap.error };
+
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders")
+    .update({ photo_path: null, updated_at: new Date().toISOString(), updated_by: ctx.userId })
+    .eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.photo.remove", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
+  return {};
+}
+
+export async function withdrawConsent(id: string): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders").select("*").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as LeaderRow;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  // All four columns clear in ONE update(): the CHECK ties photo_path/message
+  // to consent_at/consent_by, so a statement that cleared consent while
+  // either survived is exactly the half-withdrawn state it exists to forbid.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    photo_path: null,
+    message: null,
+    consent_at: null,
+    consent_by: null,
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+  }).eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Not permitted." };
+
+  if (leader.photo_path) await reapPaths(db, [leader.photo_path]);
+  await audit(ctx.userId, "leader.consent.withdraw", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
   return {};
 }
