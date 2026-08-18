@@ -17,7 +17,7 @@
     "prove:content": "node --experimental-strip-types scripts/prove-content.mjs",
     "prove:editor": "node scripts/prove-editor.mjs",
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
-    "prove:leaders": "node scripts/prove-leaders.mjs"
+    "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

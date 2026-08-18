@@ -134,12 +134,20 @@ check("a cluster head CANNOT edit another cluster's leader",
   (foreignEdit.data?.length ?? 0) === 0 && bAfter.data?.position === "Suite Fixture",
   { affected: foreignEdit.data?.length, position: bAfter.data?.position });
 
+// This statement takes a different path than the others: `using` PASSES here
+// (rowA is in cluster A, and so is the head), so the row is not filtered out —
+// `with check` rejects the new row image instead, which Postgres surfaces as an
+// error (42501), not as a zero-row result. Asserting on `data?.length` alone
+// would never go green for this statement (data is null on error, so neither
+// `?? 0` nor `?? -1` reaches a real zero) — assert on the rejection AND re-read
+// the row through the service-role client to confirm it never moved, matching
+// the identical scenario already solved this way in prove-chapters.mjs.
 const moveOut = await headClient.from("leaders")
   .update({ cluster_id: clusterB.id }).eq("id", rowA).select("id");
 const aAfterMove = await admin.from("leaders").select("cluster_id").eq("id", rowA).maybeSingle();
 check("a cluster head CANNOT move a leader into another cluster",
-  (moveOut.data?.length ?? 0) === 0 && aAfterMove.data?.cluster_id === clusterA.id,
-  { affected: moveOut.data?.length, cluster_id: aAfterMove.data?.cluster_id });
+  !!moveOut.error && aAfterMove.data?.cluster_id === clusterA.id,
+  { error: moveOut.error?.message, cluster_id: aAfterMove.data?.cluster_id });
 
 const foreignInsert = await headClient.from("leaders").insert({
   name: "Foreign Insert", slug: `foreign-${crypto.randomUUID().slice(0, 8)}`,
@@ -303,6 +311,32 @@ const touched = await admin.from("leaders")
 check("updated_at advances past created_at when the row is updated",
   !!touched.data && new Date(touched.data.updated_at) > new Date(touched.data.created_at),
   touched.error?.message ?? touched.data);
+
+console.log("\n── Public read ──");
+
+const { getLeaders } = await import("../src/lib/data/leaders.ts");
+
+const pubA = await admin.from("leaders").insert({
+  name: "Published Leader", slug: `pub-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Provincial Coordinator", is_published: true }).select("id").maybeSingle();
+const draft = await admin.from("leaders").insert({
+  name: "Draft Leader", slug: `draft-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Draft" }).select("id").maybeSingle();
+
+const published = await getLeaders();
+const ids = published.map((l) => l.id);
+check("getLeaders returns published leaders", ids.includes(pubA.data.id), ids);
+check("getLeaders omits drafts", !ids.includes(draft.data.id), ids);
+
+const softDeleteUpdate = await admin.from("leaders")
+  .update({ deleted_at: new Date().toISOString() }).eq("id", pubA.data.id).select("id");
+check("the soft-delete update succeeded", softDeleteUpdate.data?.length === 1, softDeleteUpdate.error?.message);
+const afterDelete = (await getLeaders()).map((l) => l.id);
+check("a soft-deleted leader leaves the public list", !afterDelete.includes(pubA.data.id), afterDelete);
+
+const noPhoto = published.find((l) => l.id === pubA.data.id);
+check("a leader with no photo_path yields photo === null", noPhoto?.photo === null, noPhoto?.photo);
+check("a leader with no message yields message === null", noPhoto?.message === null, noPhoto?.message);
 
 console.log("\n── Cleanup ──");
 // Blanket delete first: the sections above (and later tasks) add rows this has
