@@ -1096,6 +1096,7 @@ const withdrawUpdate = withdraw.match(/update\(\{[\s\S]*?\}\)/)?.[0] ?? "";
 check("withdrawConsent clears photo_path, message, and consent in ONE update",
   ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
   withdrawUpdate.slice(0, 120));
+```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
