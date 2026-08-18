@@ -1,0 +1,38 @@
+name: verify
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22: the prove:* suites that import TypeScript directly run under
+      # --experimental-strip-types, which needs 22 or newer.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npm run lint
+
+      # The only suite that needs no database — every assertion reads the repo's
+      # own source of truth (constants, fallbacks, migrations, seeds). The other
+      # five need SUPABASE_SERVICE_ROLE_KEY against a live project, and
+      # prove:editor additionally needs a Chromium binary and a running dev
+      # server, so they stay a local pre-merge step rather than a CI job.
+      # To enable them here: add NEXT_PUBLIC_SUPABASE_URL,
+      # NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY as repository
+      # secrets, then add a job that exports them as env before the npm run step.
+      # Note they mutate shared data, so point them at a throwaway project, never
+      # at production.
+      - run: npm run prove:content
