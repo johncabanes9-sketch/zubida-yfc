@@ -354,6 +354,42 @@ const noPhoto = published.find((l) => l.id === pubA.data.id);
 check("a leader with no photo_path yields photo === null", noPhoto?.photo === null, noPhoto?.photo);
 check("a leader with no message yields message === null", noPhoto?.message === null, noPhoto?.message);
 
+console.log("\n── Partial saves and validation ──");
+
+// Only name and position are required. A required field with no known value is
+// what makes someone type something plausible.
+const partial = await admin.from("leaders").insert({
+  name: "Partial Leader", slug: `part-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Coordinator" }).select("*").maybeSingle();
+check("a leader saves with chapter, message, and socials all blank",
+  !partial.error && partial.data.message === null && partial.data.chapter_id === null,
+  partial.error?.message);
+check("a new leader is unpublished by default",
+  partial.data?.is_published === false, partial.data?.is_published);
+
+// The "#" bug the audit logged: every fixture profile had socials of "#".
+const hashLink = await admin.from("leaders").insert({
+  name: "Hash Link", slug: `hash-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Probe", facebook_url: "#" }).select("id");
+check("the database rejects \"#\" as a social link", !!hashLink.error, hashLink.data);
+
+const httpLink = await admin.from("leaders").insert({
+  name: "Http Link", slug: `http-${crypto.randomUUID().slice(0, 8)}`,
+  position: "Probe", instagram_url: "http://example.com" }).select("id");
+check("the database rejects a non-https social link", !!httpLink.error, httpLink.data);
+
+const dupSlug = await admin.from("leaders").insert({
+  name: "Dup", slug: partial.data.slug, position: "Probe" }).select("id");
+check("the database rejects a duplicate slug", !!dupSlug.error, dupSlug.data);
+
+console.log("\n── Admin action guards (source-level) ──");
+
+const actions = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
+check("every leader action goes through requireClusterAccess",
+  (actions.match(/requireClusterAccess/g) ?? []).length >= 3, null);
+check("deleteLeader soft-deletes rather than removing the row",
+  /deleted_at/.test(actions) && !/\.delete\(\)/.test(actions), null);
+
 console.log("\n── Cleanup ──");
 // Blanket delete first: the sections above (and later tasks) add rows this has
 // to reach, and the FK consent_by -> auth.users(id) means every leader row must
