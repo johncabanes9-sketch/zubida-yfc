@@ -269,8 +269,18 @@ try {
   }).select("id").single()).data;
 
   const key1 = `chapters/cover-${stamp}/${crypto.randomUUID()}.webp`;
-  await admin.storage.from("media").upload(key1, WEBP, { contentType: "image/webp" });
-  await admin.from("chapters").update({ cover_path: key1 }).eq("id", coverRow.id);
+  const upl = await admin.storage.from("media").upload(key1, WEBP, { contentType: "image/webp" });
+  const setPath = await admin.from("chapters").update({ cover_path: key1 }).eq("id", coverRow.id).select("id");
+  const listBefore = await admin.storage.from("media").list(`chapters/cover-${stamp}`, { limit: 10 });
+  const before = (listBefore.data ?? []).filter((o) => o.id !== null);
+  // Positive control, the same presence/absence pairing "the soft-delete
+  // update on rowB succeeded" uses above: without asserting the object
+  // EXISTED first, a silently failed upload or update leaves nothing under
+  // the prefix, the post-reap absence assertion below passes trivially, and
+  // reaping is never actually exercised.
+  check("the cover object exists before the reap",
+    !upl.error && !setPath.error && before.length === 1,
+    upl.error?.message ?? setPath.error?.message ?? before);
 
   const { reapPaths } = await import("../src/lib/pages/reap.ts");
   await reapPaths(admin, [key1]);
@@ -279,6 +289,57 @@ try {
   check("reaping a cover removes the object from storage", remaining.length === 0, remaining.map((o) => o.name));
 
   await admin.from("chapters").delete().eq("id", coverRow.id);
+
+  console.log("\n── Cover action statement order (source-level) ──");
+
+  // The only behavioural proof of reap ordering above calls reapPaths()
+  // directly against a hand-built path — it never goes through
+  // uploadChapterCover/removeChapterCover/deleteChapter, so a regression that
+  // swaps the update and reap statements INSIDE those functions would not be
+  // caught by anything above. Slicing each function's body out of the file
+  // and comparing indexOf positions within that slice (not across the whole
+  // file — another function's matching statement would confuse the compare)
+  // closes that gap at the source level, the same way prove-content.mjs
+  // asserts on source text elsewhere in this project.
+  const actionsSrc = readFileSync(join(root, "src/app/admin/chapters/actions.ts"), "utf8");
+  const sliceFn = (name) => {
+    const start = actionsSrc.indexOf(`export async function ${name}`);
+    if (start === -1) return "";
+    const nextStart = actionsSrc.indexOf("export async function", start + 1);
+    return nextStart === -1 ? actionsSrc.slice(start) : actionsSrc.slice(start, nextStart);
+  };
+
+  const uploadFn = sliceFn("uploadChapterCover");
+  const uploadUpdateAt = uploadFn.indexOf("cover_path: key");
+  const uploadReapAt = uploadFn.indexOf("reapPaths(svc, [chapter.cover_path]");
+  // Reap LAST: a failure between the update and the reap then leaks the OLD
+  // object's bytes rather than losing the image the chapter now points at.
+  // Guarding both positions against -1 (as prove-editor.mjs's reorder
+  // assertion does) means a renamed call can't make this pass by accident.
+  check("uploadChapterCover updates cover_path before reaping the replaced cover",
+    uploadUpdateAt >= 0 && uploadReapAt >= 0 && uploadUpdateAt < uploadReapAt,
+    { uploadUpdateAt, uploadReapAt });
+
+  const removeFn = sliceFn("removeChapterCover");
+  const removeReapAt = removeFn.indexOf("reapPaths(svc, [chapter.cover_path]");
+  const removeUpdateAt = removeFn.indexOf("cover_path: null");
+  // Object first, then the reference: a failed reap then aborts before the
+  // row ever stops pointing at a real file, instead of leaving cover_path
+  // null while the object still sits in storage, orphaned and unreachable.
+  check("removeChapterCover reaps the cover before clearing cover_path",
+    removeReapAt >= 0 && removeUpdateAt >= 0 && removeReapAt < removeUpdateAt,
+    { removeReapAt, removeUpdateAt });
+
+  const deleteFn = sliceFn("deleteChapter");
+  const deleteReapAt = deleteFn.indexOf("reapPaths(svc,");
+  const deleteSoftDeleteAt = deleteFn.indexOf("deleted_at: new Date()");
+  // Same reasoning as removeChapterCover: reaping before the soft-delete
+  // means a failed reap aborts the delete rather than soft-deleting a chapter
+  // whose cover object is still sitting in storage, unreferenced and
+  // unreachable through the UI.
+  check("deleteChapter reaps the cover before soft-deleting the row",
+    deleteReapAt >= 0 && deleteSoftDeleteAt >= 0 && deleteReapAt < deleteSoftDeleteAt,
+    { deleteReapAt, deleteSoftDeleteAt });
 } catch (e) {
   // Anything that threw above — fixture setup, or a guard between blocks.
   // Recorded rather than re-thrown so the cleanup below still runs on a live
