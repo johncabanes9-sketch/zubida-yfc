@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireClusterAccess, loadAdminContext } from "@/lib/supabase/admin-auth";
+import { requireClusterAccess, createServerSupabase, loadAdminContext } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { leaderSchema } from "@/lib/validation/leader";
 import type { LeaderRow } from "@/lib/supabase/database.types";
@@ -67,8 +67,9 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
   // deliberately undefined on the chapter path, and requireClusterAccess()
   // redirects a non-PYH on a null argument (admin-auth.ts:72) — passing
   // `cluster_id ?? null` would bounce a cluster head adding a leader to their
-  // OWN chapter. Look the chapter's cluster up for the guard; the trigger still
-  // owns what is actually stored.
+  // OWN chapter. Look the chapter's cluster up for the guard (service role,
+  // matching updateChapter's pre-authorization reads); the trigger still owns
+  // what is actually stored.
   const db = createServiceClient();
   const guardCluster = chapter_id
     ? (await db.from("chapters").select("cluster_id").eq("id", chapter_id).maybeSingle()).data?.cluster_id ?? null
@@ -81,7 +82,12 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
     ? { consent_at: new Date().toISOString(), consent_by: ctx.userId }
     : {};
 
-  const { data, error } = await db.from("leaders").insert({
+  // The actual write goes through the RLS-respecting client — not the
+  // service-role `db` above — so the cluster-scoped policies proven in
+  // prove-leaders.mjs are a genuine second guard behind requireClusterAccess,
+  // matching createChapter exactly.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").insert({
     name: parsed.data.name,
     slug: slugFor(parsed.data.name),
     position: parsed.data.position,
@@ -92,14 +98,18 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
     instagram_url: optional(parsed.data.instagram_url),
     updated_by: ctx.userId,
     ...consent,
-  }).select("id").maybeSingle();
+  }).select("id");
 
   if (error) {
     if (error.code === "23505") return { error: "A leader with that name already exists." };
     return { error: "Could not save this leader." };
   }
-  if (!data) return { error: "Not permitted." };
-  await audit(ctx.userId, "leader.create", data.id);
+  // An INSERT's WITH CHECK failure always raises an error (there is no
+  // existing row for USING to filter), but an empty result is still checked
+  // explicitly rather than assumed impossible — the same discipline applied
+  // to update/delete below.
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.create", data[0].id);
   revalidatePath("/admin/leaders");
   revalidatePath("/leaders");
   return {};
@@ -145,7 +155,12 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
     ? { consent_at: new Date().toISOString(), consent_by: ctx.userId }
     : {};
 
-  const { data, error } = await db.from("leaders").update({
+  // The actual write goes through the RLS-respecting client — not the
+  // service-role `db` used above for the pre-authorization reads — so the
+  // cluster-scoped policies are a genuine second guard behind
+  // requireClusterAccess, matching updateChapter exactly.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
     name: parsed.data.name,
     position: parsed.data.position,
     chapter_id,
@@ -188,7 +203,9 @@ export async function deleteLeader(id: string): Promise<{ error?: string }> {
     : current.cluster_id;
   const ctx = await requireClusterAccess(guardCluster);
 
-  const { data, error } = await db.from("leaders")
+  // Write through the RLS-respecting client, matching deleteChapter.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders")
     .update({ deleted_at: new Date().toISOString(), updated_by: ctx.userId })
     .eq("id", id).select("id");
   if (error) return { error: "Could not delete this leader." };
