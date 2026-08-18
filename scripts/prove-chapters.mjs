@@ -237,6 +237,25 @@ try {
 
   const withoutCover = published.find((c) => c.id === rowAId);
   check("a chapter with no cover_path yields cover === null", withoutCover?.cover === null, withoutCover?.cover);
+
+  console.log("\n── Partial saves ──");
+
+  // Only name, municipality and cluster are required. A required field with no
+  // known value is what makes someone type something plausible.
+  const partial = await admin.from("chapters").insert({
+    cluster_id: clusterA, name: `Partial ${stamp}`, slug: `partial-${stamp}`, municipality: "Test P",
+  }).select("id, coordinator, schedule, is_published").single();
+  check("a chapter saves with coordinator and schedule blank",
+    !partial.error && partial.data.coordinator === null && partial.data.schedule === null,
+    partial.error?.message ?? partial.data);
+  check("a new chapter is unpublished by default", !partial.error && partial.data.is_published === false, partial.data);
+
+  const dupe = await admin.from("chapters").insert({
+    cluster_id: clusterA, name: "Dupe", slug: `partial-${stamp}`, municipality: "Test",
+  }).select("id");
+  check("the database rejects a duplicate slug", !!dupe.error, dupe.error?.message ?? dupe.data);
+
+  await admin.from("chapters").delete().eq("id", partial.data.id);
 } catch (e) {
   // Anything that threw above — fixture setup, or a guard between blocks.
   // Recorded rather than re-thrown so the cleanup below still runs on a live
