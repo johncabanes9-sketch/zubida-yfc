@@ -547,13 +547,20 @@ escalation probe, one at a time:
 drop policy leaders_cluster_head_update on leaders;
 ```
 
-Run `npm run prove:leaders`. Confirm **the intended assertion changes state** —
-and note that dropping an update policy makes the `CAN edit` assertion fail too,
-which is itself the signal that the assertion is wired to the policy. Restore:
+Run `npm run prove:leaders`. Confirm **the intended assertion changes state**.
 
-```bash
-npm run db:migrate
-```
+**Dropping a policy is not enough for a negative assertion.** Removing the update
+policy turns the *positive* red while all three update negatives stay green — a
+denied write is still denied when no policy exists. To see a negative flip you
+must WIDEN the policy, not remove it: replace it with `using (true)` /
+`with check (true)`, or add a permissive DELETE policy for the hard-delete check.
+
+**`npm run db:migrate` does NOT restore a dropped policy.** `scripts/db-migrate.mjs`
+skips any file already recorded in `_migrations`, so a re-run is a no-op. To
+restore, delete that migration's `_migrations` row first and re-run, or apply the
+migration's SQL directly. Verify the restore against `pg_policy` and `pg_trigger`
+before moving on — a mutation left in the database silently poisons every later
+task.
 
 Do this for `leaders_cluster_head_update`, `leaders_cluster_head_insert`, and
 `leaders_pyh_write`. For the escalation probe, instead change the trigger body to
