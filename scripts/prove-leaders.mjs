@@ -385,10 +385,24 @@ check("the database rejects a duplicate slug", !!dupSlug.error, dupSlug.data);
 console.log("\n── Admin action guards (source-level) ──");
 
 const actions = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
+// Matches call syntax only ("await requireClusterAccess(") rather than any
+// bare occurrence of the identifier. The naive /requireClusterAccess/g form
+// this replaced also matched the import statement, so it still passed with
+// only two of the three actions actually guarded.
 check("every leader action goes through requireClusterAccess",
-  (actions.match(/requireClusterAccess/g) ?? []).length >= 3, null);
+  (actions.match(/await requireClusterAccess\(/g) ?? []).length >= 3, null);
 check("deleteLeader soft-deletes rather than removing the row",
   /deleted_at/.test(actions) && !/\.delete\(\)/.test(actions), null);
+
+// The RLS-respecting client is the second guard behind requireClusterAccess
+// (see the fix in commit 1c426f5): writing through the service-role client
+// instead bypasses RLS entirely, so the cluster-scoped policies proven above
+// would be decorative on the admin write path. This is the regression guard
+// for that fix -- reverting it silently would otherwise leave the rest of
+// this suite green.
+check("leader writes go through the RLS-respecting client",
+  (actions.match(/supabase\.from\("leaders"\)/g) ?? []).length >= 3
+  && !/db\.from\("leaders"\)\s*\.?\s*(insert|update)\(/.test(actions), null);
 
 console.log("\n── Cleanup ──");
 // Blanket delete first: the sections above (and later tasks) add rows this has

@@ -123,9 +123,9 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
   await loadAdminContext();
   const db = createServiceClient();
   const { data: row } = await db.from("leaders")
-    .select("id, chapter_id, cluster_id").eq("id", id).maybeSingle();
+    .select("id, chapter_id, cluster_id, message, consent_at").eq("id", id).maybeSingle();
   if (!row) return { error: "Leader not found." };
-  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id">;
+  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "consent_at">;
 
   // Authorize against the row's CURRENT scope before allowing any change. A
   // chapter-scoped row is guarded by ITS CHAPTER'S cluster (never null — a
@@ -150,9 +150,15 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
   // message and consent move together in the SAME update() call: the CHECK
   // rejects any statement that sets a quote without a recorded basis for
   // publishing it, and splitting this into two statements would let the first
-  // one land and violate the constraint on its own.
+  // one land and violate the constraint on its own. An UNCHANGED quote keeps
+  // its ORIGINAL basis rather than being re-stamped: without this, an admin
+  // who merely toggles "Published" on someone else's leader would silently
+  // become consent_by, with consent_at moved to now -- naming a person who
+  // never actually obtained consent for that quote.
   const consent = message
-    ? { consent_at: new Date().toISOString(), consent_by: ctx.userId }
+    ? (current.message === message && current.consent_at
+        ? {} // unchanged quote keeps the basis originally recorded for it
+        : { consent_at: new Date().toISOString(), consent_by: ctx.userId })
     : {};
 
   // The actual write goes through the RLS-respecting client — not the
