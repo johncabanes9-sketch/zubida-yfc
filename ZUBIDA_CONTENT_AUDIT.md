@@ -141,6 +141,16 @@ Rendered from `page_sections` (DB) with `src/lib/pages/fallback.ts` mirroring it
 | Map pin positions | hardcoded, explicitly "non-geographic" | acceptable (labelled stylized) | but reads as a real province map |
 | 5 coordinators (Reina Lopez, Elijah Ponce, Hannah Grace Dizon, Joshua Emmanuel Rana, Clarisse Mae Tibon) | `chapters.ts` | **INCONSISTENT** | named as chapter coordinators but absent from `/leaders` |
 
+**RESOLVED — the chapters managed domain** *(2026-08-18)*. Every row above is gone
+rather than corrected. `src/data/chapters.ts` was deleted and the stylized map
+stripped out of `chapters-explorer.tsx`. `chapters` is now a database table with
+cluster-scoped RLS (migrations 0023 and 0024) that ships **empty**, and
+`/chapters` renders a withholding notice until an administrator publishes a real
+chapter. The invented `memberCount` and "up next" fields were not carried over —
+they do not exist in the new schema, and the header no longer claims a count.
+Verified by `npm run prove:chapters` (33 assertions), two of which assert that the
+migrations insert no rows.
+
 ### 2.6 Events (`/events`)
 
 | Information | Source | Accurate? | Notes |
@@ -250,7 +260,7 @@ Editing About in the admin UI (once it exists) will update the DB but **not** th
 
 | Displayed | Claimed | What the app actually contains | Verdict |
 |---|---|---|---|
-| Chapters | **26** | `src/data/chapters.ts` lists **12** | contradicted |
+| Chapters | **26** | `src/data/chapters.ts` listed **12** (file since deleted — see §2.5) | contradicted |
 | Active Members | **4,200+** | chapter member counts sum to **2,138** | contradicted (~2× overstatement) |
 | Provincial Events | **58** | `src/data/events.ts` has 6 (4 Provincial); `events` table unknown | unsourced |
 | Trained Leaders | **340+** | `src/data/leaders.ts` lists **12** | unsourced |
@@ -261,6 +271,19 @@ The "26 chapters" figure additionally propagates into three narrative locations,
 - `/chapters` header: "One province, twenty-six homes"
 - `/news` item n1 excerpt: "filling fast across all 26 chapters"
 
+**Partially resolved** *(2026-08-18)*. The stats band no longer reads from
+`src/data/stats.ts` — `getSiteStats()` in `src/lib/data/stats.ts` replaced the
+four hardcoded numbers, and the `/chapters` header no longer claims a count. The
+`stats` export in `src/data/stats.ts` is now imported by nothing; it survives only
+as the shape reference the fixtures gate documents.
+
+**STILL OPEN — the figure is reachable through two fallback paths.** "With 26
+chapters and thousands of members" is hardcoded in `DEFAULT_MILESTONES`
+(`src/components/about/timeline.tsx:13`) and again in `PAGE_FALLBACK`
+(`src/lib/pages/fallback.ts:19`), which `src/lib/data/pages.ts` serves when the
+database is unreachable. A DB outage therefore publishes a fabricated count on
+`/about`. The `/news` excerpt still carries it too, but is withheld by the
+`news: false` gate. Neither is covered by an assertion.
 ---
 
 ## 6. Images and media

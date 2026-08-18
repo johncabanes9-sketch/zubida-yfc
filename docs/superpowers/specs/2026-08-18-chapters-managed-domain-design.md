@@ -1,7 +1,8 @@
 # Chapters as a Managed Domain
 
 **Date:** 2026-08-18
-**Status:** Approved, not yet implemented
+**Status:** Implemented 2026-08-18
+**Verified by:** `npm run prove:chapters` — 33 assertions, 0 failures
 **Slice:** First of the deferred content slice (chapters, leaders, news, gallery, testimonials, FAQ)
 
 ## Problem
