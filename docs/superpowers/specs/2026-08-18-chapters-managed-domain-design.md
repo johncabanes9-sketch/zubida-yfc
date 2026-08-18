@@ -140,6 +140,23 @@ Cover images reuse the existing upload machinery unchanged: `validateImage` for
 sniffing, an object-path helper alongside `pageImageKey`, and `reapPaths` on both
 replace and delete so storage never accumulates orphans.
 
+### Data entry workflow
+
+The admin form is the only way real chapter data enters the system, so it has to
+suit how that data actually arrives: incompletely, over time.
+
+- **Partial saves must succeed.** Only `name`, `municipality` and `cluster_id` are
+  required. A chapter saves with `coordinator` and `schedule` blank and is
+  completed later. Form validation must not require a field the schema allows to
+  be null — a required field with no known value is precisely the pressure that
+  makes someone type something plausible.
+- **`is_published` defaults to `false`.** Chapters are entered as drafts, checked,
+  and published deliberately. Nothing reaches the public page by being saved.
+- **Publishing is per row.** Ten confirmed chapters can go live while two await
+  their coordinator, rather than the directory waiting on its slowest entry.
+- **Blank means withheld, and the form should say so**, matching the wording
+  `/admin/settings` already uses for the contact fields it can withhold.
+
 Navigation: cluster heads gain a Chapters tab. Consistent with the read/write
 split above, the list shows every chapter in the province; edit and delete
 controls render only for rows in the viewer's own cluster. The UI must not be the
