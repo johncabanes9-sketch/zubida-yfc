@@ -59,7 +59,7 @@ await admin.from("leaders").delete().like("slug", `${FIXTURE}%`);
 // image in unscanned. Also asserts the scan found something: an empty file
 // list would make both checks below pass vacuously.
 const leaderMigrationFiles = readdirSync(join(root, "supabase/migrations"))
-  .filter((f) => f.includes("leaders") && f.endsWith(".sql"));
+  .filter((f) => f.includes("leader") && f.endsWith(".sql"));
 check("the leaders migrations are all scanned", leaderMigrationFiles.length >= 2,
   leaderMigrationFiles);
 const leaderSql = leaderMigrationFiles
@@ -107,7 +107,9 @@ try {
 
   const clusters = await admin.from("clusters").select("id, name").order("name");
   const [clusterA, clusterB] = clusters.data ?? [];
-  if (!clusterA || !clusterB) { console.error("Need two clusters seeded."); process.exit(1); }
+  // Throws rather than exits: this is inside the try, and a leader row was
+  // already inserted above -- process.exit does not run the finally block.
+  if (!clusterA || !clusterB) throw new Error("Need two clusters seeded.");
 
   // Throwaway accounts. Deleted in Cleanup; never reuse a real admin here.
   const headEmail = `leadertest_head_${crypto.randomUUID()}@example.com`;
@@ -431,14 +433,20 @@ try {
   // `data:` are the ones that matter -- leader-card.tsx renders these values
   // straight into href, and z.string().url() on its own accepts both.
   const { leaderSchema } = await import("../src/lib/validation/leader.ts");
-  const formAccepts = (v) =>
-    leaderSchema.safeParse({ name: "N", position: "P", facebook_url: v }).success;
-  for (const bad of ["javascript:alert(1)", "data:text/html,x", "http://example.com", "#"]) {
-    check(`the form layer rejects ${bad} as a social link`, !formAccepts(bad), null);
+  // Both columns, not just one: they share optionalUrl today, but nothing
+  // would catch instagram_url being switched back to the unrefined shape.
+  const formAccepts = (field, v) =>
+    leaderSchema.safeParse({ name: "N", position: "P", [field]: v }).success;
+  for (const field of ["facebook_url", "instagram_url"]) {
+    for (const bad of ["javascript:alert(1)", "data:text/html,x", "http://example.com", "#"]) {
+      check(`the form layer rejects ${bad} as ${field}`, !formAccepts(field, bad), null);
+    }
   }
   check("the form layer accepts an https social link",
-    formAccepts("https://facebook.com/zubidayfc"), null);
-  check("the form layer accepts a blank social link", formAccepts(""), null);
+    formAccepts("facebook_url", "https://facebook.com/zubidayfc"), null);
+  check("the form layer accepts a blank social link", formAccepts("facebook_url", ""), null);
+  check("the form layer accepts an omitted social link",
+    leaderSchema.safeParse({ name: "N", position: "P" }).success, null);
 
   const dupSlug = await admin.from("leaders").insert({
     name: "Dup", slug: partial.data.slug, position: "Probe" }).select("id");
@@ -557,8 +565,21 @@ try {
 
   // The action must actually USE the rule -- a correct helper nothing calls
   // proves nothing about what gets written.
+  // The arguments matter as much as the call. With only a /consentPatch\(\{/
+  // match, changing `currentPhotoPath: current.photo_path` to `null` would
+  // regress "clearing a quote while a photo survives keeps the basis" while
+  // every assertion above stayed green -- the helper would still be correct,
+  // and still be called, with the wrong input.
+  const updBody = body("updateLeader");
   check("updateLeader decides consent through the shared rule",
-    /consentPatch\(\{/.test(body("updateLeader")), null);
+    /consentPatch\(\{/.test(updBody), null);
+  for (const arg of ["message,", "currentMessage: current.message",
+                     "currentConsentAt: current.consent_at",
+                     "currentPhotoPath: current.photo_path",
+                     "userId: ctx.userId"]) {
+    check(`updateLeader passes ${arg.replace(",", "")} to the consent rule`,
+      updBody.includes(arg), null);
+  }
 
   // updateLeader recomputed cluster_id from the EDITOR's cluster on every save,
   // so who opened the form silently decided the row's scope. The PYH's
@@ -622,12 +643,23 @@ try {
   // `createServiceClient().from("leaders").update(` defeated the negative
   // entirely, while a `>= 3` floor absorbed the rest. This is the regression
   // guard for the fix that cost a full round; it has to be name-independent.
+  // Floor plus receiver check, not an equality with the action count: a future
+  // exported action that legitimately writes nothing (a reorder, an export)
+  // would otherwise red the suite for no reason. The security property lives
+  // in the receiver check, which covers every write the pattern finds.
   const leaderWrites = [...actions.matchAll(
     /(\w+)\s*\.from\("leaders"\)\s*\.(insert|update|upsert|delete)\(/g)];
+  // A deliberately looser second pass, so a write the strict pattern cannot
+  // see (an unusual chain, a formatting the regex does not anticipate) shows
+  // up as a COUNT MISMATCH rather than silently escaping the receiver check.
+  const looseWrites = [...actions.matchAll(
+    /\.from\("leaders"\)[\s\S]{0,120}?\.(insert|update|upsert|delete)\(/g)];
   check("every leader write goes through the RLS-respecting client",
-    leaderWrites.length === exportedActions
-    && leaderWrites.every((m) => m[1] === "supabase"),
+    leaderWrites.length >= 6 && leaderWrites.every((m) => m[1] === "supabase"),
     leaderWrites.map((m) => `${m[1]}.${m[2]}`));
+  check("no leaders write escapes the receiver check",
+    looseWrites.length === leaderWrites.length,
+    { strict: leaderWrites.length, loose: looseWrites.length });
 
 } catch (e) {
   crashed = e;
@@ -658,8 +690,10 @@ try {
   // failing future runs for a reason nothing here reports.
   const deletions = await Promise.all(
     [headId, pyhId].filter(Boolean).map((u) => admin.auth.admin.deleteUser(u)));
+  // Gated on headId: if the try threw before the users were created there is
+  // nothing to delete, and reporting FAIL there would point at the wrong cause.
   check("the throwaway auth users were deleted",
-    deletions.length > 0 && deletions.every((d) => !d.error),
+    !headId || deletions.every((d) => !d.error),
     deletions.map((d) => d.error?.message).filter(Boolean));
   const leftoverUsers = await admin.from("admins").select("id")
     .in("user_id", [headId, pyhId].filter(Boolean));

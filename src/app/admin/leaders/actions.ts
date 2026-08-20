@@ -259,8 +259,11 @@ export async function deleteLeader(id: string): Promise<{ error?: string }> {
       photo_path: null,
       // No photo survives, so if there is no quote either there is no personal
       // content left for a consent basis to describe. Same rule as
-      // removeLeaderPhoto; the CHECK stays satisfied either way.
-      ...(current.message ? {} : { consent_at: null, consent_by: null }),
+      // removeLeaderPhoto; the CHECK stays satisfied either way. Compared
+      // against null rather than truthiness: an empty-string message is still
+      // a non-null message to the CHECK, so clearing consent for it would
+      // fail the constraint and abort a delete whose photo was already reaped.
+      ...(current.message !== null ? {} : { consent_at: null, consent_by: null }),
     })
     .eq("id", id).select("id");
   if (error) return { error: "Could not delete this leader." };
@@ -346,7 +349,7 @@ export async function removeLeaderPhoto(id: string): Promise<{ error?: string }>
     // No quote survives either, so there is no personal content left for a
     // consent basis to describe — clear it with the photo instead of leaving
     // it dangling. Mirrors the identical rule in updateLeader.
-    ...(leader.message ? {} : { consent_at: null, consent_by: null }),
+    ...(leader.message !== null ? {} : { consent_at: null, consent_by: null }),
   }).eq("id", id).select("id");
   if (error) return { error: error.message };
   if (!data || data.length === 0) return { error: "Not permitted." };

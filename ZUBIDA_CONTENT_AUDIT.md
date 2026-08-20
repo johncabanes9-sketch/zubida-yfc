@@ -144,7 +144,7 @@ database (`CHECK`) and the Zod validation layer. A photo or a personal quote
 additionally cannot be stored without a recorded consent basis — `consent_at`
 and `consent_by` — enforced by the
 `leaders_personal_content_requires_consent` `CHECK` constraint, not by a
-render-time filter. Verified by `npm run prove:leaders` (72 assertions), which
+render-time filter. Verified by `npm run prove:leaders` (83 assertions), which
 includes an escalation probe proving the `cluster_id`-derivation trigger
 cannot be used to write into another cluster.
 

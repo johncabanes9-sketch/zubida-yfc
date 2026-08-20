@@ -86,7 +86,7 @@ npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
 npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
-npm run prove:leaders      # 72 — the leadership directory, RLS and consent
+npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 ```
 
 CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.
