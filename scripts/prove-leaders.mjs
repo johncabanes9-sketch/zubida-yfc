@@ -483,6 +483,17 @@ check("withdrawConsent clears photo_path, message, and consent in ONE update",
   ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
   withdrawUpdate.slice(0, 120));
 
+// updateLeader recomputed cluster_id from the EDITOR's cluster on every save,
+// so who opened the form silently decided the row's scope. The PYH's
+// clusterId is null, so the PYH merely toggling "Published" on a
+// cluster-scoped leader rewrote cluster_id to null: the row dropped out of
+// leaders_cluster_head_update and the owning cluster head was locked out
+// permanently, with no error shown. Only a row LEAVING a chapter needs a
+// cluster assigned. updateChapter never touches cluster_id at all.
+const upd = body("updateLeader");
+check("updateLeader leaves a chapter-less row's cluster where it is",
+  /current\.chapter_id \? ctx\.clusterId : current\.cluster_id/.test(upd), null);
+
 // deleteLeader carries the same rule as removeLeaderPhoto, and for a stronger
 // reason: the soft delete is the LAST moment the photograph can be reached.
 // The admin list filters on deleted_at, so once the row is soft-deleted no

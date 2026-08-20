@@ -157,7 +157,17 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
 
   const chapter_id = optional(parsed.data.chapter_id);
   const message = optional(parsed.data.message);
-  const cluster_id = chapter_id ? undefined : ctx.clusterId;
+  // A chapter-less row keeps the cluster it already has. Recomputing this from
+  // ctx.clusterId reassigns scope as a side effect of who happened to open the
+  // form: the PYH's clusterId is null, so the PYH merely toggling "Published"
+  // on a cluster-scoped leader rewrote cluster_id to null -- dropping the row
+  // out of leaders_cluster_head_update and locking the owning cluster head out
+  // permanently, with no error shown. Only a row LEAVING a chapter needs a
+  // cluster assigned, and then the editor's own is the right one.
+  // updateChapter never touches cluster_id at all.
+  const cluster_id = chapter_id
+    ? undefined
+    : (current.chapter_id ? ctx.clusterId : current.cluster_id);
   if (!chapter_id && !cluster_id && !ctx.isPYH) {
     return { error: "Choose a chapter, or ask the provincial youth head to add a provincial-level leader." };
   }
