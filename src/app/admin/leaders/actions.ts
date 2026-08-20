@@ -121,6 +121,10 @@ export async function createLeader(formData: FormData): Promise<{ error?: string
 
   if (error) {
     if (error.code === "23505") return { error: "A leader with that name already exists." };
+    // 42501 is a WITH CHECK rejection, reachable here if the chosen chapter
+    // moved to another cluster between the guard read and this insert.
+    // Matches updateLeader rather than reporting it as a generic save failure.
+    if (error.code === "42501") return { error: "That change is not permitted." };
     return { error: "Could not save this leader." };
   }
   // An INSERT's WITH CHECK failure always raises an error (there is no

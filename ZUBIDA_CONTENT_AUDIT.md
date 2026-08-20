@@ -144,7 +144,7 @@ database (`CHECK`) and the Zod validation layer. A photo or a personal quote
 additionally cannot be stored without a recorded consent basis — `consent_at`
 and `consent_by` — enforced by the
 `leaders_personal_content_requires_consent` `CHECK` constraint, not by a
-render-time filter. Verified by `npm run prove:leaders` (50 assertions), which
+render-time filter. Verified by `npm run prove:leaders` (72 assertions), which
 includes an escalation probe proving the `cluster_id`-derivation trigger
 cannot be used to write into another cluster.
 
@@ -157,6 +157,18 @@ Its consequence: uploading a photo re-stamps the consent basis recorded for an
 existing, untouched quote, and vice versa. The fix, if the organization needs
 to distinguish the two bases, is to split into `photo_consent_*` /
 `message_consent_*` column pairs — a schema change, not an application bug.
+
+**Scope shipped in this slice:** the schema, the public page, and the admin
+form for a leader's name, position, chapter, quote, social links, and
+published state. The photo upload, photo removal, and consent-withdrawal
+server actions exist and are proven at the source level, but **no admin
+control invokes them yet** — wiring them into the form is the next slice.
+Until then a photograph can only be attached out-of-band, so the re-stamping
+consequence described above is dormant rather than reachable, and the
+`photo_consent_*` / `message_consent_*` split belongs in the same change that
+adds the upload control. `sort_order` is likewise present and honoured by
+`getLeaders()` but not yet writable, so the directory currently orders
+alphabetically within each scope.
 
 ### 2.5 Chapters (`/chapters`)
 

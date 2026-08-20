@@ -33,7 +33,9 @@ a real database, an authenticated admin surface, and a page CMS.
   provincial youth head manages all. Entered as drafts and published per row.
 - Leadership directory — cluster heads manage their own cluster's leaders, the
   provincial youth head manages all. A photo or a personal quote cannot be stored
-  without a recorded consent basis.
+  without a recorded consent basis. Photo upload and consent withdrawal exist as
+  server actions but are not yet wired into the admin form; that is the next
+  slice.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -84,7 +86,7 @@ npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
 npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
-npm run prove:leaders      # 51 — the leadership directory, RLS and consent
+npm run prove:leaders      # 72 — the leadership directory, RLS and consent
 ```
 
 CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.

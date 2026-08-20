@@ -1,7 +1,10 @@
 # Leaders as a Managed Domain
 
 **Date:** 2026-08-18
-**Status:** Implemented 2026-08-18 — 51 assertions (`npm run prove:leaders`)
+**Status:** Implemented 2026-08-18 — 72 assertions (`npm run prove:leaders`).
+Whole-branch review 2026-08-21: two Criticals and three Importants fixed; the
+photo and consent-withdrawal UI is deferred to the next slice, so the server
+actions for it ship unreachable by design rather than by omission.
 **Slice:** Second of the deferred content slice (chapters ✅, **leaders**, news, gallery, testimonials, FAQ)
 **Precedent:** `2026-08-18-chapters-managed-domain-design.md` — implemented, 33 assertions
 

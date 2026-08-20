@@ -55,9 +55,10 @@ export function LeaderAdmin({
     });
   };
 
-  // cluster_id is always populated by the derivation trigger, whether the row
-  // is chapter-scoped or cluster-scoped — a provincial-level row (both null)
-  // never matches a non-null clusterId, so it stays PYH-only.
+  // A chapter-scoped row gets its cluster_id from the derivation trigger; a
+  // cluster-scoped row carries the one it was inserted with. Either way it is
+  // populated, so this comparison is meaningful — and a provincial-level row
+  // (both null) never matches a non-null clusterId, so it stays PYH-only.
   const canEdit = (leader: LeaderListItem) => isPYH || clusterId === leader.cluster_id;
   const canCreate = isPYH || chapters.length > 0 || !!clusterId;
 
