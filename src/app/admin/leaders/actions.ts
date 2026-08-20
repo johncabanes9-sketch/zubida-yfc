@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { leaderSchema } from "@/lib/validation/leader";
 import { validateImage } from "@/lib/images/validate";
 import { leaderImageKey } from "@/lib/leaders/paths";
+import { consentPatch } from "@/lib/leaders/consent";
 import { reapPaths } from "@/lib/pages/reap";
 import type { LeaderRow } from "@/lib/supabase/database.types";
 
@@ -175,20 +176,19 @@ export async function updateLeader(id: string, formData: FormData): Promise<{ er
   // message and consent move together in the SAME update() call: the CHECK
   // rejects any statement that sets a quote without a recorded basis for
   // publishing it, and splitting this into two statements would let the first
-  // one land and violate the constraint on its own. An UNCHANGED quote keeps
-  // its ORIGINAL basis rather than being re-stamped: without this, an admin
-  // who merely toggles "Published" on someone else's leader would silently
-  // become consent_by, with consent_at moved to now -- naming a person who
-  // never actually obtained consent for that quote. This form never touches
-  // photo_path, so when the quote is cleared and no photo already exists on
-  // the row, there is no personal content left for the basis to describe --
-  // clear it too, rather than leaving consent_at/consent_by dangling and
-  // naming a person for content that no longer exists.
-  const consent = message
-    ? (current.message === message && current.consent_at
-        ? {} // unchanged quote keeps the basis originally recorded for it
-        : { consent_at: new Date().toISOString(), consent_by: ctx.userId })
-    : (current.photo_path ? {} : { consent_at: null, consent_by: null });
+  // one land and violate the constraint on its own. The rule deciding WHICH
+  // basis lands is in @/lib/leaders/consent, where the proof suite can drive
+  // every branch of it directly -- this action cannot be called without an
+  // authenticated request context. This form never touches photo_path, so
+  // currentPhotoPath is the row's existing one.
+  const consent = consentPatch({
+    message,
+    currentMessage: current.message,
+    currentConsentAt: current.consent_at,
+    currentPhotoPath: current.photo_path,
+    userId: ctx.userId,
+    now: new Date().toISOString(),
+  });
 
   // The actual write goes through the RLS-respecting client — not the
   // service-role `db` used above for the pre-authorization reads — so the

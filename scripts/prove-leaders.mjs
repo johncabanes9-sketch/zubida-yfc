@@ -1,7 +1,7 @@
 // Proves the leadership directory: schema, the consent constraint, cluster-scoped
 // RLS, public withholding, and that no fabricated person can enter the table.
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import dotenv from "dotenv";
@@ -53,10 +53,22 @@ if (all.error || foreign.length > 0) {
 // the guard above has already established there is nothing else here.
 await admin.from("leaders").delete().like("slug", `${FIXTURE}%`);
 
-const sql = readFileSync(join(root, "supabase/migrations/0025_leaders.sql"), "utf8");
-check("the migration inserts no leader rows", !/insert\s+into\s+leaders/i.test(sql), null);
-check("the migration carries no placeholder imagery",
-  !/picsum\.photos|i\.pravatar\.cc/i.test(sql), null);
+// 0026 is a second leaders migration (policies and the derive trigger, not the
+// table) -- scan every migration file with "leaders" in its name, not just
+// 0025, so a later leaders migration cannot slip an insert or a placeholder
+// image in unscanned. Also asserts the scan found something: an empty file
+// list would make both checks below pass vacuously.
+const leaderMigrationFiles = readdirSync(join(root, "supabase/migrations"))
+  .filter((f) => f.includes("leaders") && f.endsWith(".sql"));
+check("the leaders migrations are all scanned", leaderMigrationFiles.length >= 2,
+  leaderMigrationFiles);
+const leaderSql = leaderMigrationFiles
+  .map((f) => readFileSync(join(root, "supabase/migrations", f), "utf8"))
+  .join("\n");
+check("the leaders migrations insert no leader rows",
+  !/insert\s+into\s+leaders/i.test(leaderSql), leaderMigrationFiles);
+check("the leaders migrations carry no placeholder imagery",
+  !/picsum\.photos|i\.pravatar\.cc/i.test(leaderSql), leaderMigrationFiles);
 
 console.log("\n── Consent is a constraint, not a convention ──");
 
@@ -499,6 +511,45 @@ check("withdrawConsent clears photo_path, message, and consent in ONE update",
   ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
   withdrawUpdate.slice(0, 120));
 
+console.log("\n-- The consent basis follows the quote, not the editor --");
+
+// The rule the Task 6 review called the worst defect found in this slice, and
+// the only one that had NO assertion of any kind: reverting it left the suite
+// fully green. An admin who merely toggles "Published" on someone else's
+// leader must not become consent_by, with consent_at moved to now -- that
+// names a person who never obtained consent for that quote.
+//
+// Driven directly against the extracted rule, so every branch is exercised
+// rather than matched as source text. The action itself cannot be called here:
+// it needs an authenticated request context (the limitation recorded in Task 5).
+const { consentPatch } = await import("../src/lib/leaders/consent.ts");
+const basis = (over) => consentPatch({
+  message: "A quote.", currentMessage: "A quote.", currentConsentAt: "2026-01-01T00:00:00Z",
+  currentPhotoPath: null, userId: "editor-2", now: "2026-08-21T00:00:00Z", ...over });
+
+check("an unchanged quote keeps the basis originally recorded for it",
+  Object.keys(basis({})).length === 0, basis({}));
+check("an edited quote is stamped with a fresh basis",
+  basis({ message: "A different quote." }).consent_by === "editor-2",
+  basis({ message: "A different quote." }));
+check("a quote that never had a basis is stamped rather than left bare",
+  basis({ currentConsentAt: null }).consent_by === "editor-2",
+  basis({ currentConsentAt: null }));
+check("a new quote on a row that had none is stamped",
+  basis({ currentMessage: null, currentConsentAt: null }).consent_by === "editor-2",
+  basis({ currentMessage: null, currentConsentAt: null }));
+check("clearing the quote while a photo survives keeps the basis",
+  Object.keys(basis({ message: null, currentPhotoPath: "leaders/x/y.jpg" })).length === 0,
+  basis({ message: null, currentPhotoPath: "leaders/x/y.jpg" }));
+check("clearing the quote with no photo left clears the basis too",
+  basis({ message: null }).consent_at === null && basis({ message: null }).consent_by === null,
+  basis({ message: null }));
+
+// The action must actually USE the rule -- a correct helper nothing calls
+// proves nothing about what gets written.
+check("updateLeader decides consent through the shared rule",
+  /consentPatch\(\{/.test(body("updateLeader")), null);
+
 // updateLeader recomputed cluster_id from the EDITOR's cluster on every save,
 // so who opened the form silently decided the row's scope. The PYH's
 // clusterId is null, so the PYH merely toggling "Published" on a
@@ -535,24 +586,38 @@ for (const fn of ["removeLeaderPhoto", "withdrawConsent", "deleteLeader"]) {
 console.log("\n── Admin action guards (source-level) ──");
 
 const actions = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
-// Matches call syntax only ("await requireClusterAccess(") rather than any
-// bare occurrence of the identifier. The naive /requireClusterAccess/g form
-// this replaced also matched the import statement, so it still passed with
-// only two of the three actions actually guarded.
+// Counted against the number of exported actions rather than a fixed floor.
+// The `>= 3` form this replaces was written when there were three actions;
+// there are now six, so three could have lost their guard while an assertion
+// named "every leader action" stayed green. Matches call syntax only ("await
+// requireClusterAccess(") rather than any bare occurrence of the identifier:
+// the naive /requireClusterAccess/g form also matched the import statement.
+const exportedActions = (actions.match(/export async function /g) ?? []).length;
 check("every leader action goes through requireClusterAccess",
-  (actions.match(/await requireClusterAccess\(/g) ?? []).length >= 3, null);
+  exportedActions >= 6
+  && (actions.match(/await requireClusterAccess\(/g) ?? []).length === exportedActions,
+  { exportedActions, guarded: (actions.match(/await requireClusterAccess\(/g) ?? []).length });
 check("deleteLeader soft-deletes rather than removing the row",
   /deleted_at/.test(actions) && !/\.delete\(\)/.test(actions), null);
 
 // The RLS-respecting client is the second guard behind requireClusterAccess
 // (see the fix in commit 1c426f5): writing through the service-role client
 // instead bypasses RLS entirely, so the cluster-scoped policies proven above
-// would be decorative on the admin write path. This is the regression guard
-// for that fix -- reverting it silently would otherwise leave the rest of
-// this suite green.
-check("leader writes go through the RLS-respecting client",
-  (actions.match(/supabase\.from\("leaders"\)/g) ?? []).length >= 3
-  && !/db\.from\("leaders"\)\s*\.?\s*(insert|update)\(/.test(actions), null);
+// would be decorative on the admin write path.
+//
+// Every write is enumerated and its receiver checked, rather than counting
+// `supabase.` hits and separately forbidding the literal `db.`. That earlier
+// form was bound to one local variable name: renaming `db` to `svc` (which is
+// what the sibling chapters actions call it) or writing
+// `createServiceClient().from("leaders").update(` defeated the negative
+// entirely, while a `>= 3` floor absorbed the rest. This is the regression
+// guard for the fix that cost a full round; it has to be name-independent.
+const leaderWrites = [...actions.matchAll(
+  /(\w+)\s*\.from\("leaders"\)\s*\.(insert|update|upsert|delete)\(/g)];
+check("every leader write goes through the RLS-respecting client",
+  leaderWrites.length === exportedActions
+  && leaderWrites.every((m) => m[1] === "supabase"),
+  leaderWrites.map((m) => `${m[1]}.${m[2]}`));
 
 console.log("\n── Cleanup ──");
 // Fixture-pattern delete, not a blanket one. The blanket form this replaces
