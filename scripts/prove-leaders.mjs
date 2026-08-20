@@ -24,10 +24,34 @@ console.log("\n── Schema ──");
 const probe = await admin.from("leaders").select("id").limit(1);
 check("the leaders table exists", !probe.error, probe.error?.message);
 
+// Every row this suite creates carries this prefix, so Cleanup can sweep its
+// own fixtures without touching anything else. A blanket delete would work
+// only while the table is empty -- and this branch is the one that makes it
+// writable, so it is the last safe moment to scope it.
+const FIXTURE = "suite-ld-";
+
 // The migration must seed nothing. This is the content rule made executable: a
-// later seed intended to make the page look finished fails here.
-const all = await admin.from("leaders").select("id");
-check("the migration seeds zero leader rows", (all.data?.length ?? -1) === 0, all.data?.length);
+// later seed intended to make the page look finished fails here. `!all.error`
+// matters as much as the count: without it a failed query reads as a passing
+// "zero rows", exactly as prove-chapters.mjs guards against.
+const all = await admin.from("leaders").select("id, slug");
+const foreign = (all.data ?? []).filter((r) => !r.slug.startsWith(FIXTURE));
+check("the migration seeds zero leader rows", !all.error && foreign.length === 0,
+  all.error?.message ?? foreign.map((r) => r.slug));
+
+// Rows this suite did not create mean a real leadership directory exists in
+// this database. Everything below inserts, mutates policies, deletes admin
+// users, and sweeps rows -- none of which belongs anywhere near real people's
+// records. Refuse to run rather than assume. check() alone cannot stop this:
+// it counts a failure and keeps going.
+if (all.error || foreign.length > 0) {
+  console.error("\n  Refusing to continue: the leaders table holds rows this suite did not create.");
+  process.exit(1);
+}
+
+// Self-heal whatever a previous interrupted run left behind. Fixtures only --
+// the guard above has already established there is nothing else here.
+await admin.from("leaders").delete().like("slug", `${FIXTURE}%`);
 
 const sql = readFileSync(join(root, "supabase/migrations/0025_leaders.sql"), "utf8");
 check("the migration inserts no leader rows", !/insert\s+into\s+leaders/i.test(sql), null);
@@ -39,20 +63,20 @@ console.log("\n── Consent is a constraint, not a convention ──");
 // A face with no recorded basis for publishing it must not be storable at all.
 // Storing-then-hiding is the weaker design the spec rejects.
 const photoNoConsent = await admin.from("leaders")
-  .insert({ name: "Consent Probe A", slug: `probe-a-${crypto.randomUUID()}`,
+  .insert({ name: "Consent Probe A", slug: `suite-ld-probe-a-${crypto.randomUUID()}`,
             position: "Probe", photo_path: "leaders/probe/x.jpg" })
   .select("id").maybeSingle();
 check("a photo without consent is rejected", !!photoNoConsent.error, photoNoConsent.data);
 
 const messageNoConsent = await admin.from("leaders")
-  .insert({ name: "Consent Probe B", slug: `probe-b-${crypto.randomUUID()}`,
+  .insert({ name: "Consent Probe B", slug: `suite-ld-probe-b-${crypto.randomUUID()}`,
             position: "Probe", message: "A quote attributed to a named person." })
   .select("id").maybeSingle();
 check("a quote without consent is rejected", !!messageNoConsent.error, messageNoConsent.data);
 
 // Name and position alone carry no personal content, so they need no consent.
 const plain = await admin.from("leaders")
-  .insert({ name: "Consent Probe C", slug: `probe-c-${crypto.randomUUID()}`, position: "Probe" })
+  .insert({ name: "Consent Probe C", slug: `suite-ld-probe-c-${crypto.randomUUID()}`, position: "Probe" })
   .select("id").maybeSingle();
 check("a leader with no photo and no quote saves without consent",
   !plain.error && !!plain.data?.id, plain.error?.message);
@@ -88,7 +112,7 @@ await admin.from("admins").insert([
 // assertions too. This is the first point in the suite where a real user id
 // exists, so it is the first point where the accept branch can be proven.
 const consentAccepted = await admin.from("leaders").insert({
-  name: "Consent Accept Probe", slug: `accept-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Consent Accept Probe", slug: `suite-ld-accept-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", photo_path: "leaders/probe/accept.jpg",
   consent_at: new Date().toISOString(), consent_by: pyhId }).select("id").maybeSingle();
 check("a photo WITH consent recorded saves", !consentAccepted.error, consentAccepted.error?.message);
@@ -106,7 +130,7 @@ const pyhClient = await signedIn(pyhEmail, pyhPw);
 // this is fixture setup, not an assertion).
 const mkLeader = async (cluster_id, name) => {
   const r = await admin.from("leaders").insert({
-    name, slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${crypto.randomUUID().slice(0, 8)}`,
+    name, slug: `suite-ld-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${crypto.randomUUID().slice(0, 8)}`,
     position: "Suite Fixture", cluster_id, is_published: true }).select("id").maybeSingle();
   if (r.error) { console.error("fixture insert failed:", r.error.message); process.exit(1); }
   return r.data.id;
@@ -150,7 +174,7 @@ check("a cluster head CANNOT move a leader into another cluster",
   { error: moveOut.error?.message, cluster_id: aAfterMove.data?.cluster_id });
 
 const foreignInsert = await headClient.from("leaders").insert({
-  name: "Foreign Insert", slug: `foreign-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Foreign Insert", slug: `suite-ld-foreign-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", cluster_id: clusterB.id }).select("id");
 // An error alone would also be satisfied by a slug collision, a not-null
 // violation, or a typo'd column. The service-role re-read on a fixed name is
@@ -163,7 +187,7 @@ check("a cluster head CANNOT create a leader in another cluster",
 // Provincial-level rows have cluster_id null. `null = uuid` is null, not true,
 // so the cluster-head policy never matches them.
 const provincial = await admin.from("leaders").insert({
-  name: "Suite Provincial", slug: `prov-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Suite Provincial", slug: `suite-ld-prov-${crypto.randomUUID().slice(0, 8)}`,
   position: "Provincial Fixture" }).select("id").maybeSingle();
 const provEdit = await headClient.from("leaders")
   .update({ position: "Edited Provincial" }).eq("id", provincial.data.id).select("id");
@@ -208,7 +232,7 @@ if (chapterInB.error) { console.error("chapter fixture failed:", chapterInB.erro
 // reduced to `return new`, this assertion goes red; the chapter_id-only form
 // stayed green.
 const escalate = await headClient.from("leaders").insert({
-  name: "Escalation Probe", slug: `esc-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Escalation Probe", slug: `suite-ld-esc-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", chapter_id: chapterInB.data.id, cluster_id: clusterA.id }).select("id");
 const escalated = await admin.from("leaders").select("id, cluster_id").eq("name", "Escalation Probe");
 check("a cluster head CANNOT escalate by pointing a leader at another cluster's chapter",
@@ -219,7 +243,7 @@ check("a cluster head CANNOT escalate by pointing a leader at another cluster's 
 // reason (derived null, or derived B — either fails the check), but it is the
 // shape an app bug would produce, so it is worth its own line.
 const escalateBlind = await headClient.from("leaders").insert({
-  name: "Escalation Probe Blind", slug: `escb-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Escalation Probe Blind", slug: `suite-ld-escb-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", chapter_id: chapterInB.data.id }).select("id");
 const escalatedBlind = await admin.from("leaders").select("id").eq("name", "Escalation Probe Blind");
 check("a cluster head CANNOT create a leader in another cluster's chapter without naming a cluster",
@@ -248,7 +272,7 @@ const chapterInA = await admin.from("chapters").insert({
   name: "Suite Chapter In A", slug: `suite-ch-${crypto.randomUUID().slice(0, 8)}`,
   municipality: "Suite", cluster_id: clusterA.id }).select("id").maybeSingle();
 const derived = await headClient.from("leaders").insert({
-  name: "Derive Probe", slug: `der-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Derive Probe", slug: `suite-ld-der-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", chapter_id: chapterInA.data.id }).select("id, cluster_id").maybeSingle();
 check("the trigger derives cluster_id from chapter_id for an in-cluster chapter",
   !derived.error && derived.data?.cluster_id === clusterA.id,
@@ -269,7 +293,7 @@ const publicClient = createClient(url, anon, { auth: { persistSession: false } }
 
 const mkPublicFixture = async (name, fields) => {
   const r = await admin.from("leaders").insert({
-    name, slug: `pub-${crypto.randomUUID().slice(0, 8)}`, position: "Public Fixture",
+    name, slug: `suite-ld-pub-${crypto.randomUUID().slice(0, 8)}`, position: "Public Fixture",
     cluster_id: clusterA.id, ...fields }).select("id").maybeSingle();
   if (r.error) { console.error("public fixture failed:", r.error.message); process.exit(1); }
   return r.data.id;
@@ -298,7 +322,7 @@ console.log("\n── updated_at is maintained by the database ──");
 // 0025 attached no set_updated_at trigger, so updated_at never moved after
 // insert and the column reported a last-changed time that was never true.
 const stampProbe = await admin.from("leaders").insert({
-  name: "Stamp Probe", slug: `stamp-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Stamp Probe", slug: `suite-ld-stamp-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe" }).select("id, created_at, updated_at").maybeSingle();
 check("a fresh row starts with updated_at equal to created_at",
   !!stampProbe.data && stampProbe.data.created_at === stampProbe.data.updated_at,
@@ -317,16 +341,16 @@ console.log("\n── Public read ──");
 const { getLeaders } = await import("../src/lib/data/leaders.ts");
 
 const pubA = await admin.from("leaders").insert({
-  name: "Published Leader", slug: `pub-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Published Leader", slug: `suite-ld-pub-${crypto.randomUUID().slice(0, 8)}`,
   position: "Provincial Coordinator", is_published: true }).select("id").maybeSingle();
 const draft = await admin.from("leaders").insert({
-  name: "Draft Leader", slug: `draft-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Draft Leader", slug: `suite-ld-draft-${crypto.randomUUID().slice(0, 8)}`,
   position: "Draft" }).select("id").maybeSingle();
 
 // A second published leader that survives the soft-delete below. Without one,
 // the absence assertion has nothing to be measured against.
 const pubB = await admin.from("leaders").insert({
-  name: "Surviving Leader", slug: `surv-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Surviving Leader", slug: `suite-ld-surv-${crypto.randomUUID().slice(0, 8)}`,
   position: "Area Coordinator", is_published: true }).select("id").maybeSingle();
 
 const published = await getLeaders();
@@ -359,7 +383,7 @@ console.log("\n── Partial saves and validation ──");
 // Only name and position are required. A required field with no known value is
 // what makes someone type something plausible.
 const partial = await admin.from("leaders").insert({
-  name: "Partial Leader", slug: `part-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Partial Leader", slug: `suite-ld-part-${crypto.randomUUID().slice(0, 8)}`,
   position: "Coordinator" }).select("*").maybeSingle();
 check("a leader saves with chapter, message, and socials all blank",
   !partial.error && partial.data.message === null && partial.data.chapter_id === null,
@@ -369,12 +393,12 @@ check("a new leader is unpublished by default",
 
 // The "#" bug the audit logged: every fixture profile had socials of "#".
 const hashLink = await admin.from("leaders").insert({
-  name: "Hash Link", slug: `hash-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Hash Link", slug: `suite-ld-hash-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", facebook_url: "#" }).select("id");
 check("the database rejects \"#\" as a social link", !!hashLink.error, hashLink.data);
 
 const httpLink = await admin.from("leaders").insert({
-  name: "Http Link", slug: `http-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Http Link", slug: `suite-ld-http-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", instagram_url: "http://example.com" }).select("id");
 check("the database rejects a non-https social link", !!httpLink.error, httpLink.data);
 
@@ -385,7 +409,7 @@ check("the database rejects a duplicate slug", !!dupSlug.error, dupSlug.data);
 console.log("\n── Photos and consent withdrawal ──");
 
 const consented = await admin.from("leaders").insert({
-  name: "Photo Leader", slug: `photo-${crypto.randomUUID().slice(0, 8)}`,
+  name: "Photo Leader", slug: `suite-ld-photo-${crypto.randomUUID().slice(0, 8)}`,
   position: "Probe", photo_path: "leaders/probe/a.jpg",
   consent_at: new Date().toISOString(), consent_by: pyhId })
   .select("id").maybeSingle();
@@ -504,30 +528,47 @@ check("leader writes go through the RLS-respecting client",
   && !/db\.from\("leaders"\)\s*\.?\s*(insert|update)\(/.test(actions), null);
 
 console.log("\n── Cleanup ──");
-// Blanket delete first: the sections above (and later tasks) add rows this has
-// to reach, and the FK consent_by -> auth.users(id) means every leader row must
-// be gone before deleteUser can succeed.
-await admin.from("leaders").delete().not("id", "is", null);
+// Fixture-pattern delete, not a blanket one. The blanket form this replaces
+// (`.delete().not("id", "is", null)`) emptied the WHOLE table with the
+// service-role key against whatever .env.local points at -- harmless only
+// while the table was empty, which is precisely the state this branch ends.
+// Leaders go first: the FK consent_by -> auth.users(id) means every leader row
+// must be gone before deleteUser can succeed. Matching on the prefix rather
+// than on captured ids also lets any run self-heal what an interrupted
+// previous run left behind, the same property commit 8dbe2d8 gave the chapter
+// half of this block.
+await admin.from("leaders").delete().like("slug", `${FIXTURE}%`);
 // Matched on the fixture pattern, not the captured ids: an interrupted run
 // (this slice's policy-mutation testing hit that repeatedly) never reaches
 // this line, so ids captured in THIS run cannot sweep up rows a PRIOR
 // interrupted run left behind. Those orphans then poison prove:chapters,
-// which asserts the migration seeds zero chapter rows. Matching on the
-// fixture's own name/slug pattern instead lets any run self-heal whatever a
-// previous run left -- mirroring the leaders blanket delete above, which
-// already self-heals this way.
+// which asserts the migration seeds zero chapter rows.
 await admin.from("chapters").delete()
   .like("slug", "suite-ch-%").like("name", "Suite Chapter In%");
-await admin.from("admins").delete().in("user_id", [headId, pyhId]);
-await admin.auth.admin.deleteUser(headId);
-await admin.auth.admin.deleteUser(pyhId);
-const leftoverUsers = await admin.from("admins").select("id").in("user_id", [headId, pyhId]);
+await admin.from("admins").delete().in("user_id", [headId, pyhId].filter(Boolean));
+// deleteUser's own result is checked. The "admin accounts were removed" check
+// below queries `admins`, which the statement above has already emptied, so it
+// passes whether or not the auth.users rows actually went -- an orphaned auth
+// user would go unreported forever, and the FK from consent_by would then keep
+// failing future runs for a reason nothing here reports.
+const deletions = await Promise.all(
+  [headId, pyhId].filter(Boolean).map((u) => admin.auth.admin.deleteUser(u)));
+check("the throwaway auth users were deleted",
+  deletions.length > 0 && deletions.every((d) => !d.error),
+  deletions.map((d) => d.error?.message).filter(Boolean));
+const leftoverUsers = await admin.from("admins").select("id")
+  .in("user_id", [headId, pyhId].filter(Boolean));
 check("the throwaway admin accounts were removed",
-  (leftoverUsers.data?.length ?? -1) === 0, leftoverUsers.data);
-if (plain.data?.id) await admin.from("leaders").delete().eq("id", plain.data.id);
-const leftover = await admin.from("leaders").select("id");
-check("the suite left no leaders behind",
-  !leftover.error && (leftover.data?.length ?? -1) === 0, leftover.data);
+  !leftoverUsers.error && (leftoverUsers.data?.length ?? -1) === 0,
+  leftoverUsers.error?.message ?? leftoverUsers.data);
+
+// Scoped to the fixture prefix, not the whole table. Asserting the table is
+// empty would, once real leaders exist, assert that the suite had just
+// destroyed them -- and report green for having done it.
+const leftover = await admin.from("leaders").select("id").like("slug", `${FIXTURE}%`);
+check("the suite left no leader fixtures behind",
+  !leftover.error && (leftover.data?.length ?? -1) === 0,
+  leftover.error?.message ?? leftover.data);
 
 const leftoverChapters = await admin.from("chapters")
   .select("id").like("slug", "suite-ch-%");
