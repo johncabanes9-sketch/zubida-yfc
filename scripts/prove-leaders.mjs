@@ -402,6 +402,22 @@ const httpLink = await admin.from("leaders").insert({
   position: "Probe", instagram_url: "http://example.com" }).select("id");
 check("the database rejects a non-https social link", !!httpLink.error, httpLink.data);
 
+// The database CHECK is the floor, not the whole guard. The form layer must
+// reject the same links BEFORE the write: otherwise the admin sees a generic
+// "Could not save this leader." instead of a usable message, and a scheme the
+// CHECK does not contemplate could reach an href unopposed. `javascript:` and
+// `data:` are the ones that matter -- leader-card.tsx renders these values
+// straight into href, and z.string().url() on its own accepts both.
+const { leaderSchema } = await import("../src/lib/validation/leader.ts");
+const formAccepts = (v) =>
+  leaderSchema.safeParse({ name: "N", position: "P", facebook_url: v }).success;
+for (const bad of ["javascript:alert(1)", "data:text/html,x", "http://example.com", "#"]) {
+  check(`the form layer rejects ${bad} as a social link`, !formAccepts(bad), null);
+}
+check("the form layer accepts an https social link",
+  formAccepts("https://facebook.com/zubidayfc"), null);
+check("the form layer accepts a blank social link", formAccepts(""), null);
+
 const dupSlug = await admin.from("leaders").insert({
   name: "Dup", slug: partial.data.slug, position: "Probe" }).select("id");
 check("the database rejects a duplicate slug", !!dupSlug.error, dupSlug.data);
