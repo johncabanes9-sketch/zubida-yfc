@@ -219,16 +219,35 @@ export async function deleteLeader(id: string): Promise<{ error?: string }> {
   await loadAdminContext();
   const db = createServiceClient();
   const { data: row } = await db.from("leaders")
-    .select("id, chapter_id, cluster_id").eq("id", id).maybeSingle();
+    .select("id, chapter_id, cluster_id, message, photo_path").eq("id", id).maybeSingle();
   if (!row) return { error: "Leader not found." };
-  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id">;
+  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "photo_path">;
 
   const ctx = await requireClusterAccess(await guardClusterFor(db, current));
+
+  // Reap the photograph BEFORE the soft delete, and clear the column in the
+  // same statement that sets deleted_at. This is the last moment the file can
+  // be reached: the admin list filters on deleted_at, so a soft-deleted row
+  // can never be loaded again to remove it, and the media bucket is
+  // public-read for every object -- the face would stay retrievable by anyone
+  // holding the URL, with nothing left in the app able to delete it. Matches
+  // deleteChapter's ordering, and additionally clears photo_path so no row is
+  // ever left pointing at bytes that are already gone.
+  const reap = await reapPaths(db, current.photo_path ? [current.photo_path] : []);
+  if (reap.error) return { error: reap.error };
 
   // Write through the RLS-respecting client, matching deleteChapter.
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.from("leaders")
-    .update({ deleted_at: new Date().toISOString(), updated_by: ctx.userId })
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_by: ctx.userId,
+      photo_path: null,
+      // No photo survives, so if there is no quote either there is no personal
+      // content left for a consent basis to describe. Same rule as
+      // removeLeaderPhoto; the CHECK stays satisfied either way.
+      ...(current.message ? {} : { consent_at: null, consent_by: null }),
+    })
     .eq("id", id).select("id");
   if (error) return { error: "Could not delete this leader." };
   if (!data || data.length === 0) return { error: "Not permitted." };

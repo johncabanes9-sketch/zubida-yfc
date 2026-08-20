@@ -459,6 +459,28 @@ check("withdrawConsent clears photo_path, message, and consent in ONE update",
   ["photo_path", "message", "consent_at", "consent_by"].every((f) => withdrawUpdate.includes(f)),
   withdrawUpdate.slice(0, 120));
 
+// deleteLeader carries the same rule as removeLeaderPhoto, and for a stronger
+// reason: the soft delete is the LAST moment the photograph can be reached.
+// The admin list filters on deleted_at, so once the row is soft-deleted no
+// admin surface can ever load it again to remove the file -- and the media
+// bucket is public-read for every object, so the face stays retrievable by
+// anyone holding the URL, forever. Reaping after the update would leave that
+// state behind on any failure; reaping before it cannot.
+const del = body("deleteLeader");
+check("deleteLeader reads photo_path so the photograph can be reaped",
+  /\.select\("[^"]*photo_path[^"]*"\)/.test(del), null);
+check("deleteLeader reaps the photo before soft-deleting the row",
+  orderedBefore(del, "reapPaths(", "deleted_at:"), null);
+
+// The other half of the Task 6 Critical: ordering alone is not enough if the
+// reap error is discarded. A swallowed error reports success while the file
+// stays in the bucket. Matched on the statement, not the bare identifier, so
+// a comment mentioning the error cannot satisfy it.
+for (const fn of ["removeLeaderPhoto", "withdrawConsent", "deleteLeader"]) {
+  check(`${fn} checks the reap error instead of swallowing it`,
+    /if \(reap\.error\) return/.test(body(fn)), null);
+}
+
 console.log("\n── Admin action guards (source-level) ──");
 
 const actions = readFileSync(join(root, "src/app/admin/leaders/actions.ts"), "utf8");
