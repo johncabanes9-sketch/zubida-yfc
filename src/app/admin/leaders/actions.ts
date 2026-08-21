@@ -1,0 +1,400 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { requireClusterAccess, createServerSupabase, loadAdminContext } from "@/lib/supabase/admin-auth";
+import { createServiceClient } from "@/lib/supabase/server";
+import { leaderSchema } from "@/lib/validation/leader";
+import { validateImage } from "@/lib/images/validate";
+import { leaderImageKey } from "@/lib/leaders/paths";
+import { consentPatch } from "@/lib/leaders/consent";
+import { reapPaths } from "@/lib/pages/reap";
+import type { LeaderRow } from "@/lib/supabase/database.types";
+
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/**
+ * A name made entirely of non-ASCII-alphanumeric characters (an em dash, or
+ * non-Latin script) slugifies to "". Falling through with an empty slug would
+ * let a first such row save, then collide with a second — reporting "A leader
+ * with that name already exists." for two unrelated names. A random suffix
+ * keeps the row creatable without inventing a fake slug from content we don't
+ * have.
+ */
+const slugFor = (name: string) => slugify(name) || crypto.randomUUID().slice(0, 8);
+
+/**
+ * Trimmed, or null when blank — blank means withheld, never an empty string.
+ * Accepts both a raw FormData value and a parsed (optional) zod string, since
+ * this runs on both here.
+ */
+const optional = (v: FormDataEntryValue | string | null | undefined) => {
+  const s = String(v ?? "").trim();
+  return s.length > 0 ? s : null;
+};
+
+async function audit(userId: string, action: string, id: string) {
+  try {
+    await createServiceClient().from("audit_log")
+      .insert({ actor_user_id: userId, action, entity: "leaders", entity_id: id });
+  } catch {
+    // best-effort; never block the mutation on logging failure
+  }
+}
+
+function parseLeaderForm(formData: FormData) {
+  return leaderSchema.safeParse({
+    name: String(formData.get("name") ?? ""),
+    position: String(formData.get("position") ?? ""),
+    chapter_id: String(formData.get("chapter_id") ?? ""),
+    message: String(formData.get("message") ?? ""),
+    facebook_url: String(formData.get("facebook_url") ?? ""),
+    instagram_url: String(formData.get("instagram_url") ?? ""),
+  });
+}
+
+/** Cluster to authorize against for a row already on hand: its chapter's
+ * cluster when chapter-scoped, otherwise its own cluster_id (null for a
+ * provincial-level row). The single representation of this rule — every
+ * action that authorizes against an existing row routes through it. */
+async function guardClusterFor(
+  db: ReturnType<typeof createServiceClient>,
+  leader: Pick<LeaderRow, "chapter_id" | "cluster_id">,
+) {
+  return leader.chapter_id
+    ? (await db.from("chapters").select("cluster_id").eq("id", leader.chapter_id).maybeSingle()).data?.cluster_id ?? null
+    : leader.cluster_id;
+}
+
+export async function createLeader(formData: FormData): Promise<{ error?: string }> {
+  const ctx = await loadAdminContext();
+  const parsed = parseLeaderForm(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const chapter_id = optional(parsed.data.chapter_id);
+  const message = optional(parsed.data.message);
+
+  // cluster_id is sent ONLY for provincial-level rows. When a chapter is chosen
+  // the trigger derives it, and sending both invites the two to disagree.
+  const cluster_id = chapter_id ? undefined : ctx.clusterId;
+  if (!chapter_id && !cluster_id && !ctx.isPYH) {
+    return { error: "Choose a chapter, or ask the provincial youth head to add a provincial-level leader." };
+  }
+
+  // The guard needs a real cluster to compare against. `cluster_id` is
+  // deliberately undefined on the chapter path, and requireClusterAccess()
+  // redirects a non-PYH on a null argument (admin-auth.ts:72) — passing
+  // `cluster_id ?? null` would bounce a cluster head adding a leader to their
+  // OWN chapter. Look the chapter's cluster up for the guard (service role,
+  // matching updateChapter's pre-authorization reads); the trigger still owns
+  // what is actually stored. There is no existing row here (this is a create),
+  // so guardClusterFor — which authorizes against a row already on hand —
+  // does not apply; the lookup is inlined instead.
+  const db = createServiceClient();
+  const guardCluster = chapter_id
+    ? (await db.from("chapters").select("cluster_id").eq("id", chapter_id).maybeSingle()).data?.cluster_id ?? null
+    : cluster_id ?? null;
+  await requireClusterAccess(guardCluster);
+
+  // message and consent move together: the CHECK rejects any statement that
+  // sets a quote without a recorded basis for publishing it.
+  const consent = message
+    ? { consent_at: new Date().toISOString(), consent_by: ctx.userId }
+    : {};
+
+  // The actual write goes through the RLS-respecting client — not the
+  // service-role `db` above — so the cluster-scoped policies proven in
+  // prove-leaders.mjs are a genuine second guard behind requireClusterAccess,
+  // matching createChapter exactly.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").insert({
+    name: parsed.data.name,
+    slug: slugFor(parsed.data.name),
+    position: parsed.data.position,
+    chapter_id,
+    cluster_id,
+    message,
+    facebook_url: optional(parsed.data.facebook_url),
+    instagram_url: optional(parsed.data.instagram_url),
+    updated_by: ctx.userId,
+    ...consent,
+  }).select("id");
+
+  if (error) {
+    if (error.code === "23505") return { error: "A leader with that name already exists." };
+    // 42501 is a WITH CHECK rejection, reachable here if the chosen chapter
+    // moved to another cluster between the guard read and this insert.
+    // Matches updateLeader rather than reporting it as a generic save failure.
+    if (error.code === "42501") return { error: "That change is not permitted." };
+    return { error: "Could not save this leader." };
+  }
+  // An INSERT's WITH CHECK failure always raises an error (there is no
+  // existing row for USING to filter), but an empty result is still checked
+  // explicitly rather than assumed impossible — the same discipline applied
+  // to update/delete below.
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.create", data[0].id);
+  revalidatePath("/admin/leaders");
+  revalidatePath("/leaders");
+  return {};
+}
+
+export async function updateLeader(id: string, formData: FormData): Promise<{ error?: string }> {
+  // Authenticate BEFORE the service-role read: otherwise an unauthenticated
+  // caller gets a distinguishable response ("Leader not found." for an unknown
+  // id vs. a redirect for a real one) — a UUID existence oracle, plus an
+  // unauthenticated DB round-trip. Matches updateChapter.
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, message, photo_path, consent_at").eq("id", id).maybeSingle();
+  if (!row) return { error: "Leader not found." };
+  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "photo_path" | "consent_at">;
+
+  // Authorize against the row's CURRENT scope before allowing any change. A
+  // chapter-scoped row is guarded by ITS CHAPTER'S cluster (never null — a
+  // cluster head editing a leader in their own chapter must not be bounced,
+  // same reasoning as createLeader above); a cluster-level row by its own
+  // cluster_id; a provincial-level row (both null) opens to the PYH only.
+  const ctx = await requireClusterAccess(await guardClusterFor(db, current));
+
+  const parsed = parseLeaderForm(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const chapter_id = optional(parsed.data.chapter_id);
+  const message = optional(parsed.data.message);
+  // A chapter-less row keeps the cluster it already has. Recomputing this from
+  // ctx.clusterId reassigns scope as a side effect of who happened to open the
+  // form: the PYH's clusterId is null, so the PYH merely toggling "Published"
+  // on a cluster-scoped leader rewrote cluster_id to null -- dropping the row
+  // out of leaders_cluster_head_update and locking the owning cluster head out
+  // permanently, with no error shown. Only a row LEAVING a chapter needs a
+  // cluster assigned, and then the editor's own is the right one.
+  // updateChapter never touches cluster_id at all.
+  const cluster_id = chapter_id
+    ? undefined
+    : (current.chapter_id ? ctx.clusterId : current.cluster_id);
+  if (!chapter_id && !cluster_id && !ctx.isPYH) {
+    return { error: "Choose a chapter, or ask the provincial youth head to add a provincial-level leader." };
+  }
+
+  // message and consent move together in the SAME update() call: the CHECK
+  // rejects any statement that sets a quote without a recorded basis for
+  // publishing it, and splitting this into two statements would let the first
+  // one land and violate the constraint on its own. The rule deciding WHICH
+  // basis lands is in @/lib/leaders/consent, where the proof suite can drive
+  // every branch of it directly -- this action cannot be called without an
+  // authenticated request context. This form never touches photo_path, so
+  // currentPhotoPath is the row's existing one.
+  const consent = consentPatch({
+    message,
+    currentMessage: current.message,
+    currentConsentAt: current.consent_at,
+    currentPhotoPath: current.photo_path,
+    userId: ctx.userId,
+    now: new Date().toISOString(),
+  });
+
+  // The actual write goes through the RLS-respecting client — not the
+  // service-role `db` used above for the pre-authorization reads — so the
+  // cluster-scoped policies are a genuine second guard behind
+  // requireClusterAccess, matching updateChapter exactly.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    name: parsed.data.name,
+    position: parsed.data.position,
+    chapter_id,
+    cluster_id,
+    message,
+    facebook_url: optional(parsed.data.facebook_url),
+    instagram_url: optional(parsed.data.instagram_url),
+    is_published: formData.get("is_published") === "on",
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+    ...consent,
+  }).eq("id", id).select("id");
+
+  if (error) {
+    if (error.code === "23505") return { error: "A leader with that name already exists." };
+    // 42501 is a WITH CHECK rejection — e.g. the derived cluster_id moved the
+    // row out of the editor's authority. A 0-row result with no error (an RLS
+    // USING mismatch) is handled below, separately, so a denied write is never
+    // reported as a silent success either way.
+    if (error.code === "42501") return { error: "That change is not permitted." };
+    return { error: "Could not save this leader." };
+  }
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.update", id);
+  revalidatePath("/admin/leaders");
+  revalidatePath("/leaders");
+  return {};
+}
+
+export async function deleteLeader(id: string): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, message, photo_path").eq("id", id).maybeSingle();
+  if (!row) return { error: "Leader not found." };
+  const current = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "photo_path">;
+
+  const ctx = await requireClusterAccess(await guardClusterFor(db, current));
+
+  // Reap the photograph BEFORE the soft delete, and clear the column in the
+  // same statement that sets deleted_at. This is the last moment the file can
+  // be reached: the admin list filters on deleted_at, so a soft-deleted row
+  // can never be loaded again to remove it, and the media bucket is
+  // public-read for every object -- the face would stay retrievable by anyone
+  // holding the URL, with nothing left in the app able to delete it. Matches
+  // deleteChapter's ordering, and additionally clears photo_path so no row is
+  // ever left pointing at bytes that are already gone.
+  const reap = await reapPaths(db, current.photo_path ? [current.photo_path] : []);
+  if (reap.error) return { error: reap.error };
+
+  // Write through the RLS-respecting client, matching deleteChapter.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders")
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_by: ctx.userId,
+      photo_path: null,
+      // No photo survives, so if there is no quote either there is no personal
+      // content left for a consent basis to describe. Same rule as
+      // removeLeaderPhoto; the CHECK stays satisfied either way. Compared
+      // against null rather than truthiness: an empty-string message is still
+      // a non-null message to the CHECK, so clearing consent for it would
+      // fail the constraint and abort a delete whose photo was already reaped.
+      ...(current.message !== null ? {} : { consent_at: null, consent_by: null }),
+    })
+    .eq("id", id).select("id");
+  if (error) return { error: "Could not delete this leader." };
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.delete", id);
+  revalidatePath("/admin/leaders");
+  revalidatePath("/leaders");
+  return {};
+}
+
+export async function uploadLeaderPhoto(id: string, formData: FormData): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, slug, photo_path").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "slug" | "photo_path">;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "No file selected." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const v = validateImage(bytes, file.size);
+  if (!v.ok) return { error: v.reason };
+
+  const key = leaderImageKey(leader.slug, v.mime);
+  const upl = await db.storage.from("media").upload(key, bytes, { contentType: v.mime, upsert: false });
+  if (upl.error) return { error: "Upload failed." };
+
+  // A new photo is new personal content, so consent is stamped fresh here —
+  // unlike updateLeader's unchanged-quote exception, there is no prior basis
+  // for THIS image to preserve. photo_path and the consent pair land in the
+  // SAME update(): the CHECK rejects any statement that separates them, so
+  // there is no "upload now, record consent later" path by construction.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    photo_path: key,
+    consent_at: new Date().toISOString(),
+    consent_by: ctx.userId,
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+  }).eq("id", id).select("id");
+  if (error || !data || data.length === 0) {
+    await db.storage.from("media").remove([key]);
+    return { error: error?.message ?? "Not permitted." };
+  }
+
+  // Reap the object the row used to point at only AFTER the row has moved off
+  // it: the new photo is already saved and the row already updated, so a
+  // crash right here leaks bytes in storage rather than pointing the page at
+  // an object that no longer exists.
+  if (leader.photo_path && leader.photo_path !== key) {
+    await reapPaths(db, [leader.photo_path]);
+  }
+  await audit(ctx.userId, "leader.photo", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
+  return {};
+}
+
+export async function removeLeaderPhoto(id: string): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, message, photo_path").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "message" | "photo_path">;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  // The storage object goes first, and the row only moves once that succeeds:
+  // a failed removal leaves the row still pointing at a file that still
+  // exists, never pointing at one that is already gone. An empty array is a
+  // no-op inside reapPaths, so a leader with no photo simply falls through to
+  // a column that was already empty.
+  const reap = await reapPaths(db, leader.photo_path ? [leader.photo_path] : []);
+  if (reap.error) return { error: reap.error };
+
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    photo_path: null,
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+    // No quote survives either, so there is no personal content left for a
+    // consent basis to describe — clear it with the photo instead of leaving
+    // it dangling. Mirrors the identical rule in updateLeader.
+    ...(leader.message !== null ? {} : { consent_at: null, consent_by: null }),
+  }).eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Not permitted." };
+  await audit(ctx.userId, "leader.photo.remove", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
+  return {};
+}
+
+export async function withdrawConsent(id: string): Promise<{ error?: string }> {
+  await loadAdminContext();
+  const db = createServiceClient();
+  const { data: row } = await db.from("leaders")
+    .select("id, chapter_id, cluster_id, photo_path").eq("id", id).single();
+  if (!row) return { error: "Leader not found." };
+  const leader = row as Pick<LeaderRow, "id" | "chapter_id" | "cluster_id" | "photo_path">;
+  const ctx = await requireClusterAccess(await guardClusterFor(db, leader));
+
+  // The storage object is reaped before the row is touched. Updating the row
+  // first and reaping after would report withdrawal as successful even if the
+  // reap then failed — leaving the photograph in the bucket with no row left
+  // that can reach it, retained forever. Deleting the bytes is the
+  // load-bearing half of a withdrawal; a withdrawal that reports success
+  // without removing the file is worse than one that fails loudly. Matches
+  // removeLeaderPhoto's ordering exactly.
+  const reap = await reapPaths(db, leader.photo_path ? [leader.photo_path] : []);
+  if (reap.error) return { error: reap.error };
+
+  // All four columns clear in ONE update(): the CHECK ties photo_path/message
+  // to consent_at/consent_by, so a statement that cleared consent while
+  // either survived is exactly the half-withdrawn state it exists to forbid.
+  const supabase = await createServerSupabase();
+  const { data, error } = await supabase.from("leaders").update({
+    photo_path: null,
+    message: null,
+    consent_at: null,
+    consent_by: null,
+    updated_at: new Date().toISOString(),
+    updated_by: ctx.userId,
+  }).eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Not permitted." };
+
+  await audit(ctx.userId, "leader.consent.withdraw", id);
+  revalidatePath("/leaders");
+  revalidatePath("/admin/leaders");
+  return {};
+}

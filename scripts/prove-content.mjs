@@ -7,7 +7,7 @@
 //   4. Phase-1 demo fixtures stay behind their publication gate.
 //
 // Companion to ZUBIDA_CONTENT_AUDIT.md. Run: npm run prove:content
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -151,7 +151,7 @@ check("migration 0017 rewrites the chapter-count sentence", m17.includes("twenty
 // ── 3. Placeholder media is never rendered unconditionally ─────────────────
 // The fixture modules may keep their stock URLs; the surfaces that render them
 // must be gated.
-for (const page of ["leaders", "news", "gallery"]) {
+for (const page of ["news", "gallery"]) {
   const src = read(`src/app/${page}/page.tsx`);
   check(
     `/${page} gates its fixture content behind isVerified`,
@@ -177,7 +177,7 @@ check(
 // ── 4. Fixture gates stay shut until content is confirmed ──────────────────
 // These flip only when an administrator supplies verified content — and the
 // domain should move to a managed table at that point, not stay a fixture.
-for (const domain of ["leaders", "news", "gallery", "testimonials", "aboutHistory", "photography"]) {
+for (const domain of ["news", "gallery", "testimonials", "aboutHistory", "photography"]) {
   check(`fixture domain "${domain}" is not published as fact`, isVerified(domain) === false, domain);
 }
 
@@ -203,6 +203,33 @@ check(
   "an empty chapters list renders the withholding notice",
   /chapters\.length\s*>\s*0\s*\?/.test(code("src/app/chapters/page.tsx")) &&
     code("src/app/chapters/page.tsx").includes("UnpublishedNotice"),
+  null,
+);
+
+// The leaders directory moved out of the fixture system entirely (Task 4): the
+// fixture file is deleted, and the page reads the database directly instead of
+// gating on isVerified().
+check(
+  "the leaders fixture is deleted",
+  !existsSync(join(root, "src/data/leaders.ts")),
+  null,
+);
+check(
+  "the leaders page reads the database, not the fixture",
+  code("src/app/leaders/page.tsx").includes("getLeaders") &&
+    !code("src/app/leaders/page.tsx").includes("isVerified"),
+  null,
+);
+check(
+  "an empty leaders list renders the withholding notice",
+  /leaders\.length\s*>\s*0\s*\?/.test(code("src/app/leaders/page.tsx")) &&
+    code("src/app/leaders/page.tsx").includes("UnpublishedNotice"),
+  null,
+);
+// The invented taxonomy must not come back with the table.
+check(
+  "the LeaderCategory taxonomy is gone",
+  !code("src/data/types.ts").includes("LeaderCategory"),
   null,
 );
 

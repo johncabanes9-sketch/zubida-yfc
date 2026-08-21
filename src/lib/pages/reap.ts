@@ -29,7 +29,7 @@ export function collectImagePaths(content: unknown): string[] {
 export async function reapPaths(svc: MinimalClient, paths: string[]): Promise<{ error?: string }> {
   if (paths.length === 0) return {};
   const rm = await svc.storage.from("media").remove(paths);
-  if (rm.error) return { error: "Could not delete the page's image files. Please try again." };
+  if (rm.error) return { error: "Could not delete the stored image files. Please try again." };
   return {};
 }
 
