@@ -1,10 +1,9 @@
 "use client";
-import { Button } from "@/components/ui/button";
-import type { SiteSettingsRow, NavItemRow } from "@/lib/supabase/database.types";
 
-const field = "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
-const heading = "font-display text-xl font-semibold";
+import { Button } from "@/components/ui/button";
+import { Card, CardBody } from "@/components/ui/card";
+import { Field, FieldGroup, Input, Textarea } from "@/components/ui/field";
+import type { SiteSettingsRow, NavItemRow } from "@/lib/supabase/database.types";
 
 export function SettingsForm({
   settings,
@@ -18,82 +17,136 @@ export function SettingsForm({
   saveNav: (formData: FormData) => void;
 }) {
   return (
-    <div className="grid gap-8">
-      <form action={saveSettings} className="glass grid max-w-2xl gap-4 rounded-2xl p-6">
-        <h2 className={heading}>Identity</h2>
-        <label className="block"><span className={label}>Site name</span>
-          <input name="name" required defaultValue={settings.name} className={field} /></label>
-        <label className="block"><span className={label}>Full name</span>
-          <input name="full_name" required defaultValue={settings.full_name} className={field} /></label>
-        <label className="block"><span className={label}>Tagline</span>
-          <input name="tagline" required defaultValue={settings.tagline} className={field} /></label>
-        <label className="block"><span className={label}>Description</span>
-          <textarea name="description" rows={3} required defaultValue={settings.description} className={field} /></label>
-        <label className="block"><span className={label}>Province</span>
-          <input name="province" required defaultValue={settings.province} className={field} /></label>
-        <label className="block"><span className={label}>Site URL</span>
-          <input type="url" name="site_url" required defaultValue={settings.site_url ?? ""} className={field} />
-          <span className="mt-1 block text-xs text-muted">
-            The public address of this site, e.g. https://zubidayfc.org. Used for
-            canonical links and link previews when a page is shared.
-          </span></label>
+    <div className="grid max-w-2xl gap-8">
+      <Card>
+        <form action={saveSettings}>
+          <CardBody className="grid gap-6">
+            <FieldGroup title="Identity">
+              <Field label="Site name" required>
+                <Input name="name" required defaultValue={settings.name} />
+              </Field>
+              <Field label="Full name" required>
+                <Input name="full_name" required defaultValue={settings.full_name} />
+              </Field>
+              <Field label="Tagline" required>
+                <Input name="tagline" required defaultValue={settings.tagline} />
+              </Field>
+              <Field label="Description" required>
+                <Textarea name="description" rows={3} required defaultValue={settings.description} />
+              </Field>
+              <Field label="Province" required>
+                <Input name="province" required defaultValue={settings.province} />
+              </Field>
+              <Field
+                label="Site URL"
+                required
+                hint="The public address of this site, e.g. https://zubidayfc.org. Used for canonical links and link previews when a page is shared."
+              >
+                <Input type="url" name="site_url" required defaultValue={settings.site_url ?? ""} />
+              </Field>
+            </FieldGroup>
 
-        <h2 className={heading}>Contact</h2>
-        <p className="text-xs text-muted">
-          Leave blank to withhold a channel — the site then shows no email or phone
-          at all, rather than one nobody answers. Fill it in once it is confirmed.
-        </p>
-        <label className="block"><span className={label}>Email</span>
-          <input type="email" name="email" defaultValue={settings.email} className={field} /></label>
-        <label className="block"><span className={label}>Phone</span>
-          <input name="phone" defaultValue={settings.phone} className={field} /></label>
-        <label className="block"><span className={label}>Office address</span>
-          <input name="office" required defaultValue={settings.office} className={field} /></label>
+            <FieldGroup
+              title="Contact"
+              description="Leave blank to withhold a channel — the site then shows no email or phone at all, rather than one nobody answers. Fill it in once it is confirmed."
+            >
+              <Field label="Email">
+                <Input type="email" name="email" defaultValue={settings.email} />
+              </Field>
+              <Field label="Phone">
+                <Input name="phone" defaultValue={settings.phone} />
+              </Field>
+              <Field label="Office address" required>
+                <Input name="office" required defaultValue={settings.office} />
+              </Field>
+            </FieldGroup>
 
-        <h2 className={heading}>Socials</h2>
-        <p className="text-xs text-muted">Leave blank to hide the icon.</p>
-        <label className="block"><span className={label}>Facebook URL</span>
-          <input name="facebook_url" defaultValue={settings.facebook_url ?? ""} className={field} /></label>
-        <label className="block"><span className={label}>Instagram URL</span>
-          <input name="instagram_url" defaultValue={settings.instagram_url ?? ""} className={field} /></label>
+            <FieldGroup title="Socials" description="Leave blank to hide the icon.">
+              <Field label="Facebook URL">
+                <Input name="facebook_url" defaultValue={settings.facebook_url ?? ""} />
+              </Field>
+              <Field label="Instagram URL">
+                <Input name="instagram_url" defaultValue={settings.instagram_url ?? ""} />
+              </Field>
+            </FieldGroup>
 
-        <h2 className={heading}>Footer</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block"><span className={label}>Explore heading</span>
-            <input name="footer_explore_heading" required defaultValue={settings.footer_explore_heading} className={field} /></label>
-          <label className="block"><span className={label}>Reach Us heading</span>
-            <input name="footer_reach_heading" required defaultValue={settings.footer_reach_heading} className={field} /></label>
-        </div>
-        <label className="block"><span className={label}>Closing line</span>
-          <input name="footer_closing_line" required defaultValue={settings.footer_closing_line} className={field} /></label>
+            <FieldGroup title="Footer">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Explore heading" required>
+                  <Input
+                    name="footer_explore_heading"
+                    required
+                    defaultValue={settings.footer_explore_heading}
+                  />
+                </Field>
+                <Field label="Reach Us heading" required>
+                  <Input
+                    name="footer_reach_heading"
+                    required
+                    defaultValue={settings.footer_reach_heading}
+                  />
+                </Field>
+              </div>
+              <Field label="Closing line" required>
+                <Input
+                  name="footer_closing_line"
+                  required
+                  defaultValue={settings.footer_closing_line}
+                />
+              </Field>
+            </FieldGroup>
 
-        <div><Button type="submit">Save settings</Button></div>
-      </form>
+            <div>
+              <Button type="submit">Save settings</Button>
+            </div>
+          </CardBody>
+        </form>
+      </Card>
 
-      <form action={saveNav} className="glass grid max-w-2xl gap-4 rounded-2xl p-6">
-        <h2 className={heading}>Navigation</h2>
-        <p className="text-xs text-muted">
-          Rename, reorder (lower number appears first), or hide menu items. Links are fixed to existing pages.
-        </p>
-        {navItems.map((n) => (
-          <div key={n.href} className="grid grid-cols-[1fr_5rem_4rem] items-end gap-3">
-            <input type="hidden" name="href" value={n.href} />
-            <label className="block">
-              <span className={label}>{n.href}</span>
-              <input name={`label:${n.href}`} required defaultValue={n.label} className={field} />
-            </label>
-            <label className="block">
-              <span className={label}>Order</span>
-              <input type="number" name={`order:${n.href}`} min={1} defaultValue={n.sort_order} className={field} />
-            </label>
-            <label className="flex items-center gap-2 pb-2">
-              <input type="checkbox" name={`visible:${n.href}`} defaultChecked={n.visible} />
-              <span className={label}>Show</span>
-            </label>
-          </div>
-        ))}
-        <div><Button type="submit">Save navigation</Button></div>
-      </form>
+      <Card>
+        <form action={saveNav}>
+          <CardBody className="grid gap-4">
+            <FieldGroup
+              title="Navigation"
+              description="Rename, reorder (lower number appears first), or hide menu items. Links are fixed to existing pages."
+            >
+              {navItems.map((n) => (
+                <div
+                  key={n.href}
+                  className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_5.5rem_4.5rem]"
+                >
+                  <input type="hidden" name="href" value={n.href} />
+                  <Field label={n.href} required>
+                    <Input name={`label:${n.href}`} required defaultValue={n.label} />
+                  </Field>
+                  <Field label="Order">
+                    <Input
+                      type="number"
+                      name={`order:${n.href}`}
+                      min={1}
+                      defaultValue={n.sort_order}
+                    />
+                  </Field>
+                  <label className="flex items-center gap-2 pb-2.5">
+                    <input
+                      type="checkbox"
+                      name={`visible:${n.href}`}
+                      defaultChecked={n.visible}
+                      className="h-4 w-4 rounded border-[var(--rule-strong)] accent-royal-700 dark:accent-gold-400"
+                    />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Show
+                    </span>
+                  </label>
+                </div>
+              ))}
+            </FieldGroup>
+            <div>
+              <Button type="submit">Save navigation</Button>
+            </div>
+          </CardBody>
+        </form>
+      </Card>
     </div>
   );
 }

@@ -21,6 +21,19 @@ const controlBase =
   "focus:border-royal-500 focus:ring-2 focus:ring-royal-500/25 dark:focus:border-gold-400 dark:focus:ring-gold-400/25 " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
+/**
+ * The same control styling as a raw class string.
+ *
+ * Forms that are already built out of hand-written <label> markup — the page
+ * editor and the two directory forms — consume these instead of the components
+ * above. That is deliberate: it removes the drift (which was the real defect:
+ * nine copies had become three paddings and two focus treatments) without
+ * restructuring JSX that a browser proof asserts against.
+ */
+export const fieldClass = controlBase;
+export const labelClass =
+  "text-xs font-semibold uppercase tracking-wide text-muted";
+
 const invalidRing =
   "border-danger-500 focus:border-danger-500 focus:ring-danger-500/25 " +
   "dark:border-danger-300 dark:focus:border-danger-300 dark:focus:ring-danger-300/25";

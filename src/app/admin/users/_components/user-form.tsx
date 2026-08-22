@@ -1,29 +1,63 @@
 "use client";
+
 import { Button } from "@/components/ui/button";
+import { Card, CardBody } from "@/components/ui/card";
+import { Field, Input, Select } from "@/components/ui/field";
 
 export type ClusterOption = { id: string; name: string };
 
-const field = "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
-
-export function CreateUserForm({ action, clusters }: { action: (fd: FormData) => void; clusters: ClusterOption[] }) {
+export function CreateUserForm({
+  action,
+  clusters,
+}: {
+  action: (fd: FormData) => void;
+  clusters: ClusterOption[];
+}) {
   return (
-    <form action={action} className="glass grid max-w-xl gap-4 rounded-2xl p-6">
-      <label className="block"><span className={label}>Full name</span>
-        <input name="full_name" required className={field} /></label>
-      <label className="block"><span className={label}>Email</span>
-        <input type="email" name="email" required className={field} /></label>
-      <label className="block"><span className={label}>Username (optional)</span>
-        <input name="username" className={field} /></label>
-      <label className="block"><span className={label}>Cluster</span>
-        <select name="cluster_id" required className={field}>
-          <option value="">Select cluster…</option>
-          {clusters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select></label>
-      <label className="block"><span className={label}>Password</span>
-        <input type="text" name="password" required minLength={10} className={field} /></label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" value="true" defaultChecked /> Active</label>
-      <div><Button type="submit">Create cluster head</Button></div>
-    </form>
+    <Card className="max-w-xl">
+      <form action={action}>
+        <CardBody className="grid gap-4">
+          <Field label="Full name" required>
+            <Input name="full_name" required autoComplete="name" />
+          </Field>
+          <Field label="Email" required>
+            <Input type="email" name="email" required autoComplete="email" />
+          </Field>
+          <Field label="Username" hint="Optional. Used only as a display handle.">
+            <Input name="username" autoComplete="off" />
+          </Field>
+          <Field label="Cluster" required>
+            <Select name="cluster_id" required defaultValue="">
+              <option value="">Select cluster…</option>
+              {clusters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Password"
+            required
+            hint="At least 10 characters. Shown in plain text so you can copy it before sending it on."
+          >
+            <Input type="text" name="password" required minLength={10} autoComplete="new-password" />
+          </Field>
+          <label className="flex items-center gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="is_active"
+              value="true"
+              defaultChecked
+              className="h-4 w-4 rounded border-[var(--rule-strong)] accent-royal-700 dark:accent-gold-400"
+            />
+            Active
+          </label>
+          <div>
+            <Button type="submit">Create cluster head</Button>
+          </div>
+        </CardBody>
+      </form>
+    </Card>
   );
 }

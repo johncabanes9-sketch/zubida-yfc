@@ -414,10 +414,15 @@ check(
 // withhold a channel they cannot confirm. Socials already carry the affordance
 // ("Leave blank to hide the icon"); contact details need the same.
 const settingsForm = code("src/app/admin/settings/_components/settings-form.tsx");
-const inputFor = (name) => new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(settingsForm)?.[0] ?? "";
+// A missing match is not evidence of anything. Without this, renaming the
+// element (as the <Input> primitive migration did) made the two can-be-cleared
+// assertions below pass against an empty string — a silent false pass, where
+// the office assertion at least failed loudly.
+const found = (name) => inputFor(name) !== "";
+const inputFor = (name) => new RegExp(`<[Ii]nput[^>]*name="${name}"[^>]*>`).exec(settingsForm)?.[0] ?? "";
 
-check("the email field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("email")), inputFor("email"));
-check("the phone field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("phone")), inputFor("phone"));
+check("the email field can be cleared in /admin/settings", found("email") && !/\brequired\b/.test(inputFor("email")), inputFor("email"));
+check("the phone field can be cleared in /admin/settings", found("phone") && !/\brequired\b/.test(inputFor("phone")), inputFor("phone"));
 check("the office address is still required", /\brequired\b/.test(inputFor("office")), inputFor("office"));
 check("the contact section says what a blank field means", /Leave blank to withhold/.test(settingsForm), null);
 
