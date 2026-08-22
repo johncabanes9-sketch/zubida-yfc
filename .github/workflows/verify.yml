@@ -25,9 +25,10 @@ jobs:
 
       - run: npm run lint
 
-      # The only suite that needs no database — every assertion reads the repo's
-      # own source of truth (constants, fallbacks, migrations, seeds). The other
-      # five need SUPABASE_SERVICE_ROLE_KEY against a live project, and
+      # The two suites that need no database. prove:content reads the repo's own
+      # source of truth (constants, fallbacks, migrations, seeds); prove:metrics
+      # exercises the dashboard's pure arithmetic. The other six need
+      # SUPABASE_SERVICE_ROLE_KEY against a live project, and
       # prove:editor additionally needs a Chromium binary and a running dev
       # server, so they stay a local pre-merge step rather than a CI job.
       # To enable them here: add NEXT_PUBLIC_SUPABASE_URL,
@@ -36,3 +37,4 @@ jobs:
       # Note they mutate shared data, so point them at a throwaway project, never
       # at production.
       - run: npm run prove:content
+      - run: npm run prove:metrics
