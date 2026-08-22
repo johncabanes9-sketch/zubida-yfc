@@ -78,7 +78,8 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 95 assertions — the only suite that needs no database
+npm run prove:content      # 95 assertions — needs no database
+npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership

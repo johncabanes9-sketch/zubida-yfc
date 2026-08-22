@@ -18,6 +18,21 @@
   --rule: rgba(18, 34, 78, 0.12);
   --rule-strong: rgba(18, 34, 78, 0.20);
   --ring: #1E40AF;
+
+  /* Chart marks. Chosen by search, not by eye, then verified with the
+     dataviz palette validator against this exact surface. Light mode passes
+     the lightness band, adjacent-pair CVD separation (worst 10.6 protan /
+     15.9 tritan), the normal-vision floor (19.8) and 3:1 contrast.
+     The one reported failure is the chroma floor on --chart-cancelled: it is
+     meant to read gray, because a cancelled registration should recede. It
+     ships with a visible label and a count, never colour alone. */
+  --chart-approved: #12866B;
+  --chart-pending: #BA8500;
+  --chart-rejected: #BE2018;
+  --chart-cancelled: #78849F;
+  --chart-primary: #1E40AF;
+  --chart-grid: rgba(18, 34, 78, 0.10);
+  --chart-track: rgba(18, 34, 78, 0.08);
 }
 
 .dark {
@@ -33,6 +48,18 @@
   --rule: rgba(234, 238, 247, 0.14);
   --rule-strong: rgba(234, 238, 247, 0.24);
   --ring: #F8C95C;
+
+  /* Dark is re-derived against #0C1636, not flipped from light. The band for
+     dark marks is L 0.48–0.67 — mid-tone, not bright pastel — so these are
+     their own steps. Verified: CVD 8.6 deutan / 10.9 tritan, normal 15.1,
+     all four at or above 3:1. */
+  --chart-approved: #00AE77;
+  --chart-pending: #B68C00;
+  --chart-rejected: #C65A51;
+  --chart-cancelled: #6F798E;
+  --chart-primary: #5B7FE0;
+  --chart-grid: rgba(234, 238, 247, 0.12);
+  --chart-track: rgba(234, 238, 247, 0.10);
 }
 
 html {

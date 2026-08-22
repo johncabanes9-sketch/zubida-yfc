@@ -15,6 +15,7 @@
     "prove:uploads": "node --experimental-strip-types scripts/prove-uploads.mjs",
     "prove:pages": "node --experimental-strip-types scripts/prove-pages.mjs",
     "prove:content": "node --experimental-strip-types scripts/prove-content.mjs",
+    "prove:metrics": "node --experimental-strip-types scripts/prove-metrics.mjs",
     "prove:editor": "node scripts/prove-editor.mjs",
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
     "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs"
