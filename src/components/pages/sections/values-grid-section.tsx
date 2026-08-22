@@ -13,7 +13,7 @@ export function ValuesGridSection({ content }: { content: ValuesGridContent }) {
           return (
             <Reveal key={v.title} delay={(i % 3) * 0.1}>
               <div className="glass h-full rounded-3xl p-7 shadow-card transition-transform duration-300 hover:-translate-y-1.5">
-                <span className="grid h-12 w-12 place-items-center rounded-xl bg-gold-500/15 text-gold-600 dark:text-gold-400">
+                <span className="grid h-12 w-12 place-items-center rounded-xl bg-gold-500/15 text-gold-700 dark:text-gold-400">
                   <Icon className="h-6 w-6" />
                 </span>
                 <h3 className="mt-5 font-display text-lg font-semibold">{v.title}</h3>

@@ -48,7 +48,7 @@ export default async function ContactPage() {
               {contactItems.map((c, i) => (
                 <Reveal key={c.label} delay={i * 0.1}>
                   <div className="glass flex items-start gap-4 rounded-2xl p-5 shadow-card">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gold-500/15 text-gold-600 dark:text-gold-400">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gold-500/15 text-gold-700 dark:text-gold-400">
                       <c.icon className="h-5 w-5" />
                     </span>
                     <div>

@@ -75,7 +75,16 @@ export default async function RootLayout({
 }) {
   const { site, navLinks } = await getSiteSettings();
   return (
-    <html lang="en" className={`${fraunces.variable} ${jakarta.variable}`}>
+    // suppressHydrationWarning: themeScript below adds the `dark` class to <html>
+    // before React hydrates, so the server markup and the client DOM genuinely
+    // differ by that one class. This is the intended mechanism — it is what
+    // prevents a flash of light theme — and the warning is the only thing that
+    // needs silencing, on this element alone.
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${jakarta.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

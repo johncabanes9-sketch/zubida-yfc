@@ -222,7 +222,7 @@ function Field({
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-muted">
         {label}
-        {required && <span className="text-gold-600"> *</span>}
+        {required && <span className="text-gold-700 dark:text-gold-400"> *</span>}
       </span>
       {children}
     </label>

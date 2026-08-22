@@ -8,11 +8,29 @@ export interface Crumb {
   href?: string;
 }
 
-export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
+/** `onDark` is for the public page header, which sits on midnight — there the
+ *  page's own --fg/--muted tokens are the wrong ink entirely. */
+export type CrumbTone = "default" | "onDark";
+
+export function Breadcrumbs({
+  items,
+  tone = "default",
+  className,
+}: {
+  items: Crumb[];
+  tone?: CrumbTone;
+  className?: string;
+}) {
   if (items.length === 0) return null;
+  const onDark = tone === "onDark";
   return (
     <nav aria-label="Breadcrumb" className={cn("min-w-0", className)}>
-      <ol className="flex flex-wrap items-center gap-1 text-sm text-muted">
+      <ol
+        className={cn(
+          "flex flex-wrap items-center gap-1 text-sm",
+          onDark ? "text-cream/70" : "text-muted",
+        )}
+      >
         {items.map((item, i) => {
           const isLast = i === items.length - 1;
           return (
@@ -23,12 +41,20 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
               {item.href && !isLast ? (
                 <Link
                   href={item.href}
-                  className="rounded transition-colors hover:text-royal-700 dark:hover:text-gold-300"
+                  className={cn(
+                    "rounded transition-colors",
+                    onDark
+                      ? "hover:text-gold-300"
+                      : "hover:text-royal-700 dark:hover:text-gold-300",
+                  )}
                 >
                   {item.label}
                 </Link>
               ) : (
-                <span className="font-medium text-[var(--fg)]" aria-current={isLast ? "page" : undefined}>
+                <span
+                  className={cn("font-medium", onDark ? "text-cream" : "text-[var(--fg)]")}
+                  aria-current={isLast ? "page" : undefined}
+                >
                   {item.label}
                 </span>
               )}

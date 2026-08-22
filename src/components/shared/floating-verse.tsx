@@ -32,7 +32,7 @@ export function FloatingVerse() {
             className="glass fixed bottom-24 right-5 z-40 w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl p-6 shadow-soft"
           >
             <div className="mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gold-600 dark:text-gold-400">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-gold-700 dark:text-gold-400">
                 <BookOpen className="h-4 w-4" /> Daily Verse
               </span>
               <button

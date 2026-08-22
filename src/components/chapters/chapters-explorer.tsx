@@ -24,7 +24,7 @@ export function ChaptersExplorer({ chapters }: { chapters: PublicChapter[] }) {
             <div className="flex flex-1 flex-col gap-4 p-6">
               <div>
                 {chapter.clusterName && (
-                  <span className="inline-block rounded-full bg-gold-500/15 px-2.5 py-0.5 text-[0.65rem] font-semibold text-gold-600 dark:text-gold-400">
+                  <span className="inline-block rounded-full bg-gold-500/15 px-2.5 py-0.5 text-[0.65rem] font-semibold text-gold-700 dark:text-gold-400">
                     {chapter.clusterName}
                   </span>
                 )}
@@ -70,7 +70,7 @@ function Detail({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gold-500/15 text-gold-600 dark:text-gold-400">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gold-500/15 text-gold-700 dark:text-gold-400">
         {icon}
       </span>
       <div>

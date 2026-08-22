@@ -69,7 +69,7 @@ export function AboutTeaser() {
             {pillars.map((p, i) => (
               <Reveal key={p.title} delay={0.1 + i * 0.1}>
                 <div className="flex gap-4 rounded-2xl p-4 transition-colors hover:bg-royal-700/5 dark:hover:bg-white/5">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gold-500/15 text-gold-600 dark:text-gold-400">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gold-500/15 text-gold-700 dark:text-gold-400">
                     <p.icon className="h-6 w-6" />
                   </span>
                   <div>

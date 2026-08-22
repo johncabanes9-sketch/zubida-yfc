@@ -26,7 +26,7 @@ export function SectionHeading({
       {eyebrow && (
         <div
           className={cn(
-            "mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-gold-600 dark:text-gold-400",
+            "mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-gold-700 dark:text-gold-400",
             align === "center" && "justify-center",
           )}
         >
