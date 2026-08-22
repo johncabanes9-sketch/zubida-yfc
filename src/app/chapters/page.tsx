@@ -23,7 +23,13 @@ export default async function ChaptersPage() {
         title="One province, many homes"
         subtitle="From the bay of Pagadian to the hills of the north, find the Zubida YFC chapter nearest you and see what God is doing there."
       />
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section
+        aria-labelledby="chapters-list"
+        className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <h2 id="chapters-list" className="sr-only">
+          Chapter directory
+        </h2>
         {chapters.length > 0 ? (
           <ChaptersExplorer chapters={chapters} />
         ) : (

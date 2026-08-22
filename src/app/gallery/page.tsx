@@ -18,7 +18,13 @@ export default function GalleryPage() {
         title="Grace, caught in a moment"
         subtitle="Worship, service, and friendship across the province — relive the memories."
       />
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section
+        aria-labelledby="gallery-list"
+        className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <h2 id="gallery-list" className="sr-only">
+          Photo gallery
+        </h2>
         {isVerified("gallery") ? (
           <GalleryGrid />
         ) : (

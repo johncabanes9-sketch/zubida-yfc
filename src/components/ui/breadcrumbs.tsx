@@ -42,7 +42,7 @@ export function Breadcrumbs({
                 <Link
                   href={item.href}
                   className={cn(
-                    "rounded transition-colors",
+                    "inline-block rounded py-1 transition-colors",
                     onDark
                       ? "hover:text-gold-300"
                       : "hover:text-royal-700 dark:hover:text-gold-300",
