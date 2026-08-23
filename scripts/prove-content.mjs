@@ -474,5 +474,32 @@ check(
   [...namedControls].filter((n) => n.includes("consent")),
 );
 
+// The NOT_OURS exemption above is a promise that something else renders the
+// widget which injects that field. That promise was false for the whole life of
+// the form: /api/register verified cf-turnstile-response, nothing rendered a
+// widget, and setting TURNSTILE_SECRET_KEY would have rejected every single
+// registration. An exemption has to be backed by the thing it exempts.
+if (regForm.includes("cf-turnstile-response")) {
+  check(
+    "reading cf-turnstile-response means the form actually renders the widget",
+    /<Turnstile\b/.test(regForm),
+    "registration-form.tsx reads the Turnstile field but renders no widget",
+  );
+  // tryRead, not read: a deleted widget must fail this assertion, not crash the
+  // suite before the rest have run.
+  check(
+    "the Turnstile widget loads Cloudflare's script",
+    tryRead("src/components/shared/turnstile.tsx").includes("challenges.cloudflare.com/turnstile"),
+  );
+}
+
+// Both halves of the captcha are gated on env vars, and setting only the server
+// half breaks registration outright. The route must detect that, not just fail.
+const registerRoute = code("src/app/api/register/route.ts");
+check(
+  "the register route detects a half-configured captcha",
+  registerRoute.includes("NEXT_PUBLIC_TURNSTILE_SITE_KEY"),
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

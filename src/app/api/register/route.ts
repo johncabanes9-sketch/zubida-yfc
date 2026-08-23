@@ -23,6 +23,18 @@ function fail(code: RegistrationErrorCode) {
 async function verifyTurnstile(token: string | undefined, ip: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true; // degraded mode: no captcha configured
+  // Half-configured is the dangerous state: the secret alone makes every
+  // registration fail CAPTCHA_FAILED, because no widget renders without the
+  // site key, so no token is ever submitted. It shipped that way once. Fail
+  // closed, but say why — a silent 400 on every submission is undiagnosable.
+  if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+    console.error(
+      "TURNSTILE_SECRET_KEY is set but NEXT_PUBLIC_TURNSTILE_SITE_KEY is not. " +
+        "No captcha widget renders, so every registration will be rejected. " +
+        "Set both, or neither.",
+    );
+    return false;
+  }
   if (!token) return false;
   try {
     const res = await fetch(

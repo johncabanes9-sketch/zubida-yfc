@@ -6,6 +6,10 @@ import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import type { EventItem } from "@/data/types";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, Input, Select } from "@/components/ui/field";
+import { Turnstile } from "./turnstile";
+
+/** Inlined at build time. Unset locally, which puts the server in degraded mode too. */
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 const chapters = [
   "Pagadian City", "Molave", "Labangan", "Aurora", "Tukuran",
@@ -308,6 +312,8 @@ export function RegistrationForm({ event }: { event: EventItem }) {
           <span>{error}</span>
         </div>
       )}
+
+      {TURNSTILE_SITE_KEY && <Turnstile siteKey={TURNSTILE_SITE_KEY} />}
 
       <Button type="submit" size="lg" className="w-full" disabled={submitting || !consent}>
         {submitting ? (
