@@ -53,6 +53,12 @@ notice until an administrator publishes a real one.
 `npm run prove:content` enforces this: 95 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
+## Design
+
+The visual system, the rules a change has to keep, and the measured reasons
+behind them: **[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md)**. Read it before
+adding a component or introducing a colour.
+
 ## Tech Stack
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS · Framer Motion ·
