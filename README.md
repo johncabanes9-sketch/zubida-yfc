@@ -85,7 +85,7 @@ npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
 npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
-npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
+npm run prove:editor       # 41 — the /admin/pages editing loop, in a real browser
 npm run prove:a11y         # 64 — the public accessibility floor, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent

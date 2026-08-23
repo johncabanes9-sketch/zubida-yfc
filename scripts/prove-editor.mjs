@@ -40,7 +40,7 @@ const PW = "ProveEditor!2026";
 // Every assertion the walkthrough makes when nothing goes wrong. A block that
 // exits early reports its own FAIL, but the assertions after it go silently
 // missing — this makes a short run loud instead of letting it read as a clean one.
-const EXPECTED_ASSERTIONS = 39;
+const EXPECTED_ASSERTIONS = 41;
 const stamp = Date.now();
 // Two disjoint markers — neither is a substring of the other. One shared marker
 // made three public-page assertions unsound: once the SEO title is saved, every
@@ -234,6 +234,11 @@ try {
   // <div role="status"> static-route indicator, so the bare attribute selector
   // resolves to two elements and Playwright's strict mode throws.
   const notice = () => page.locator('p[role="status"]');
+  // Scoped to the sidebar on purpose: the public navbar and footer also render
+  // on admin routes and carry links named "Events", "Chapters" and "Leaders",
+  // so an unscoped role query counts three of each and proves nothing.
+  const sidebarLinks = async (p) =>
+    (await p.locator("aside nav a").allTextContents()).map((t) => t.trim()).filter(Boolean);
   const publicHtml = async (p) => { await p.goto(`${BASE_URL}/${SLUG}`, { waitUntil: "domcontentloaded" }); return p.content(); };
 
   await step("Access control", async () => {
@@ -247,6 +252,9 @@ try {
     await signIn(page, pyhEmail);
     check("the PYH signs in and lands on the dashboard", new URL(page.url()).pathname === "/admin", page.url());
     check("the Pages tab is offered to a PYH", await page.getByRole("link", { name: "Pages", exact: true }).count() === 1, null);
+    const pyhNav = await sidebarLinks(page);
+    check("the PYH sidebar offers every section, grouped in order",
+      JSON.stringify(pyhNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders","Users","Pages","Logs","Settings"]), pyhNav);
     await page.goto(`${BASE_URL}/admin/pages`);
     check("the pages list links to the About editor", await page.locator(`a[href="/admin/pages/${SLUG}/edit"]`).count() === 1, null);
     await page.goto(`${BASE_URL}/admin/pages/${SLUG}/edit`);
@@ -361,6 +369,9 @@ try {
       await signIn(chPage, chEmail);
       check("the cluster head signs in", new URL(chPage.url()).pathname === "/admin", chPage.url());
       check("no Pages tab is offered to a cluster head", await chPage.getByRole("link", { name: "Pages", exact: true }).count() === 0, null);
+      const chNav = await sidebarLinks(chPage);
+      check("the cluster head sidebar withholds every PYH-only section",
+        JSON.stringify(chNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders"]), chNav);
       await chPage.goto(`${BASE_URL}/admin/pages`);
       check("the cluster head is redirected away from the pages list", chPage.url().includes("/admin?error=forbidden"), chPage.url());
       await chPage.goto(`${BASE_URL}/admin/pages/${SLUG}/edit`);
