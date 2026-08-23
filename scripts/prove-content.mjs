@@ -414,10 +414,15 @@ check(
 // withhold a channel they cannot confirm. Socials already carry the affordance
 // ("Leave blank to hide the icon"); contact details need the same.
 const settingsForm = code("src/app/admin/settings/_components/settings-form.tsx");
-const inputFor = (name) => new RegExp(`<input[^>]*name="${name}"[^>]*>`).exec(settingsForm)?.[0] ?? "";
+// A missing match is not evidence of anything. Without this, renaming the
+// element (as the <Input> primitive migration did) made the two can-be-cleared
+// assertions below pass against an empty string — a silent false pass, where
+// the office assertion at least failed loudly.
+const found = (name) => inputFor(name) !== "";
+const inputFor = (name) => new RegExp(`<[Ii]nput[^>]*name="${name}"[^>]*>`).exec(settingsForm)?.[0] ?? "";
 
-check("the email field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("email")), inputFor("email"));
-check("the phone field can be cleared in /admin/settings", !/\brequired\b/.test(inputFor("phone")), inputFor("phone"));
+check("the email field can be cleared in /admin/settings", found("email") && !/\brequired\b/.test(inputFor("email")), inputFor("email"));
+check("the phone field can be cleared in /admin/settings", found("phone") && !/\brequired\b/.test(inputFor("phone")), inputFor("phone"));
 check("the office address is still required", /\brequired\b/.test(inputFor("office")), inputFor("office"));
 check("the contact section says what a blank field means", /Leave blank to withhold/.test(settingsForm), null);
 
@@ -439,6 +444,34 @@ check(
   /where[\s\S]*phone\s*=\s*'\+63 962 000 0000'/i.test(m22) &&
     /where[\s\S]*email\s*=\s*'hello@zubidayfc\.org'/i.test(m22),
   null,
+);
+
+
+// -- 5. Every field the registration payload reads is actually submitted ------
+// A control with no `name` is omitted from FormData entirely, so `fd.get(...)`
+// returns null and the payload silently carries a wrong value. That is exactly
+// how the consent checkbox shipped: unnamed, so the payload always said
+// consent:false, which registrationSchema rejects with "Consent is required" --
+// the public registration form could not be submitted at all. Nothing failed
+// loudly, because the read succeeded and simply returned nothing.
+const regForm = code("src/components/shared/registration-form.tsx");
+// Injected into the form by the Turnstile widget script, not rendered by us.
+const NOT_OURS = new Set(["cf-turnstile-response"]);
+const readKeys = [...regForm.matchAll(/fd\.get\("([^"]+)"\)/g)]
+  .map((m) => m[1])
+  .filter((k) => !NOT_OURS.has(k));
+const namedControls = new Set([...regForm.matchAll(/name="([^"]+)"/g)].map((m) => m[1]));
+check("the registration form reads at least ten fields", readKeys.length >= 10, readKeys.length);
+const unsubmitted = [...new Set(readKeys)].filter((k) => !namedControls.has(k));
+check(
+  "every field the registration payload reads has a named control",
+  unsubmitted.length === 0,
+  unsubmitted,
+);
+check(
+  "the consent checkbox is named, so consent:true can ever be sent",
+  namedControls.has("consent"),
+  [...namedControls].filter((n) => n.includes("consent")),
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

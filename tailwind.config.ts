@@ -21,11 +21,15 @@ const config: Config = {
         },
         royal: {
           DEFAULT: "#1E40AF",
+          50: "#EAEFFC",
+          100: "#DCE5FA",
+          300: "#A9BFF3",
           400: "#5B7FE0",
           500: "#3B6FE0",
           600: "#2A54C4",
           700: "#1E40AF",
           800: "#1A357F",
+          900: "#16296E",
         },
         gold: {
           DEFAULT: "#F5B942",
@@ -34,11 +38,50 @@ const config: Config = {
           400: "#F8C95C",
           500: "#F5B942",
           600: "#E09E1F",
+          // gold-600 measures 2.18:1 on cream — below the 4.5:1 AA floor.
+          // Use gold-700 for gold-coloured *text* on any light surface.
+          700: "#8A5A06",
         },
         cream: {
           DEFAULT: "#FBF8F1",
           100: "#FDFBF6",
           200: "#F4EEE0",
+        },
+        // Cool-tinted neutrals, hue-matched to `midnight` so admin chrome
+        // (borders, table rules, meta text) sits in the same family as the
+        // brand rather than reading as a foreign grey.
+        neutral: {
+          50: "#F6F7FA",
+          100: "#EDEFF5",
+          200: "#DDE1EB",
+          300: "#B7C0D8",
+          400: "#8A95B4",
+          500: "#6B7796",
+          600: "#525E7D",
+          700: "#3D4763",
+          800: "#2A3249",
+          900: "#1A2035",
+        },
+        // Semantic rungs. Every `-700` clears 4.5:1 on cream AND white;
+        // every `-300` clears 4.5:1 on midnight-950. The `-50` rungs are
+        // badge fills, paired with their own `-700` text.
+        success: {
+          50: "#E3F5EE",
+          300: "#6EE7B7",
+          500: "#0F9668",
+          700: "#0B6E4F",
+        },
+        warn: {
+          50: "#FBF0DC",
+          300: "#FCD34D",
+          500: "#C87D0F",
+          700: "#9A5B08",
+        },
+        danger: {
+          50: "#FDE9E7",
+          300: "#FDA29B",
+          500: "#D92D20",
+          700: "#B42318",
         },
       },
       fontFamily: {

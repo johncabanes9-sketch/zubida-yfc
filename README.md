@@ -53,6 +53,12 @@ notice until an administrator publishes a real one.
 `npm run prove:content` enforces this: 95 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
+## Design
+
+The visual system, the rules a change has to keep, and the measured reasons
+behind them: **[docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md)**. Read it before
+adding a component or introducing a colour.
+
 ## Tech Stack
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS · Framer Motion ·
@@ -78,13 +84,15 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 95 assertions — the only suite that needs no database
+npm run prove:content      # 95 assertions — needs no database
+npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
 npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
-npm run prove:editor       # 39 — the /admin/pages editing loop, in a real browser
+npm run prove:editor       # 41 — the /admin/pages editing loop, in a real browser
+npm run prove:a11y         # 64 — the public accessibility floor, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 ```
@@ -94,9 +102,12 @@ The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
 
-`prove:editor` is the only suite that drives a browser, and the only one that
-edits published content — it snapshots `/about`, edits it, restores it, and then
-asserts the restore succeeded. Two things it needs that the others don't:
+`prove:editor` and `prove:a11y` are the two suites that drive a browser.
+`prove:a11y` needs no database — it audits the public pages at a 390px viewport
+for landmarks, heading order, image alts, accessible names, the WCAG 2.5.8
+24px target floor, and a visible focus ring. `prove:editor` is the only suite
+that edits published content — it snapshots `/about`, edits it, restores it, and
+then asserts the restore succeeded. Both need two things the others don't:
 
 ```bash
 npx playwright install chromium   # the binary lives in the Playwright cache,

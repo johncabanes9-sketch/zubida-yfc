@@ -1,6 +1,12 @@
 "use client";
+
 import { useTransition } from "react";
+import { UserCog } from "lucide-react";
 import { setActive, resetPassword, deleteClusterHead } from "../actions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export type UserRow = {
   user_id: string;
@@ -12,45 +18,93 @@ export type UserRow = {
 
 export function UsersTable({ rows }: { rows: UserRow[] }) {
   const [pending, start] = useTransition();
+
+  const columns: Column<UserRow>[] = [
+    {
+      key: "full_name",
+      header: "Name",
+      primary: true,
+      cell: (u) => (
+        <>
+          <span className="block font-medium text-[var(--fg)]">{u.full_name ?? "—"}</span>
+          <span className="block text-xs text-muted sm:hidden">{u.username ?? "—"}</span>
+        </>
+      ),
+    },
+    {
+      key: "username",
+      header: "Username",
+      hideOnCard: true,
+      cell: (u) => u.username ?? "—",
+    },
+    { key: "cluster", header: "Cluster", cell: (u) => u.cluster_name ?? "—" },
+    {
+      key: "status",
+      header: "Status",
+      cell: (u) => (
+        <Badge tone={u.is_active ? "success" : "neutral"}>
+          {u.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      actions: true,
+      align: "right",
+      cell: (u) => (
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button
+            size="xs"
+            variant="subtle"
+            disabled={pending}
+            onClick={() => start(() => setActive(u.user_id, !u.is_active))}
+          >
+            {u.is_active ? "Deactivate" : "Activate"}
+          </Button>
+          <Button
+            size="xs"
+            variant="subtle"
+            disabled={pending}
+            onClick={() => {
+              const p = prompt("New password (min 10 chars):");
+              if (p) {
+                const fd = new FormData();
+                fd.set("password", p);
+                start(() => resetPassword(u.user_id, fd));
+              }
+            }}
+          >
+            Reset password
+          </Button>
+          <Button
+            size="xs"
+            variant="danger"
+            disabled={pending}
+            onClick={() => {
+              if (confirm("Delete this cluster head?")) start(() => deleteClusterHead(u.user_id));
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="glass overflow-x-auto rounded-2xl">
-      <table className="w-full min-w-[760px] text-sm">
-        <thead className="text-left text-muted">
-          <tr className="border-b border-black/5 dark:border-white/10">
-            <th className="p-3 font-medium">Name</th>
-            <th className="p-3 font-medium">Username</th>
-            <th className="p-3 font-medium">Cluster</th>
-            <th className="p-3 font-medium">Status</th>
-            <th className="p-3 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((u) => (
-            <tr key={u.user_id} className="border-t border-black/5 dark:border-white/10">
-              <td className="p-3">{u.full_name ?? "—"}</td>
-              <td className="p-3">{u.username ?? "—"}</td>
-              <td className="p-3">{u.cluster_name ?? "—"}</td>
-              <td className="p-3">
-                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${u.is_active ? "bg-emerald-500/15 text-emerald-600" : "bg-slate-500/15 text-slate-500"}`}>
-                  {u.is_active ? "Active" : "Inactive"}
-                </span>
-              </td>
-              <td className="p-3">
-                <div className="flex flex-wrap gap-2">
-                  <button disabled={pending} onClick={() => start(() => setActive(u.user_id, !u.is_active))} className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-600 disabled:opacity-40">
-                    {u.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button disabled={pending} onClick={() => { const p = prompt("New password (min 10 chars):"); if (p) { const fd = new FormData(); fd.set("password", p); start(() => resetPassword(u.user_id, fd)); } }} className="rounded-full bg-royal-500/15 px-3 py-1 text-xs font-semibold text-royal-600 dark:text-royal-300 disabled:opacity-40">Reset password</button>
-                  <button disabled={pending} onClick={() => { if (confirm("Delete this cluster head?")) start(() => deleteClusterHead(u.user_id)); }} className="rounded-full bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-600 disabled:opacity-40">Delete</button>
-                </div>
-              </td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr><td colSpan={5} className="p-10 text-center text-muted">No cluster heads yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      rows={rows}
+      columns={columns}
+      rowKey={(u) => u.user_id}
+      caption="Cluster heads, with activate, reset password and delete actions"
+      empty={
+        <EmptyState
+          icon={UserCog}
+          title="No cluster heads yet"
+          description="Add a cluster head to give them scoped access to their own cluster."
+        />
+      }
+    />
   );
 }

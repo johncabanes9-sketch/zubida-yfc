@@ -7,19 +7,18 @@ import type { EventItem } from "@/data/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "./event-modal";
-import { cn } from "@/lib/utils";
 import { Reveal } from "./reveal";
 import { LiveSlots } from "@/components/events/live-slots";
-
-const statusStyles: Record<EventItem["status"], string> = {
-  Open: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  Closed: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  Finished: "bg-slate-500/15 text-slate-500 dark:text-slate-400",
-};
+import { Countdown } from "@/components/events/countdown";
+import { Badge, toneForStatus } from "@/components/ui/badge";
+import { share } from "@/lib/admin/metrics";
 
 export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: number }) {
   const [open, setOpen] = useState(false);
-  const pct = Math.min(100, Math.round((event.slotsTaken / event.slotsTotal) * 100));
+  // share() guards the divide-by-zero. An event with no cap used to compute
+  // 0/0 here, which rendered as `width: NaN%` — an invalid declaration the
+  // browser drops, leaving the track empty with no explanation.
+  const pct = Math.min(100, Math.round(share(event.slotsTaken, event.slotsTotal)));
 
   return (
     <>
@@ -34,14 +33,12 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
               className="object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-midnight-950/70 to-transparent" />
-            <span
-              className={cn(
-                "absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur",
-                statusStyles[event.status],
-              )}
+            <Badge
+              tone={toneForStatus(event.status)}
+              className="absolute right-3 top-3 backdrop-blur"
             >
               {event.status}
-            </span>
+            </Badge>
             <span className="absolute left-3 top-3 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-midnight-900 backdrop-blur dark:bg-midnight-900/80 dark:text-cream">
               {event.scope}
             </span>
@@ -51,15 +48,22 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
             <h3 className="font-display text-xl font-semibold leading-snug">
               {event.name}
             </h3>
+            {event.status === "Open" && (
+              <Countdown
+                target={event.date}
+                passedLabel="Happening now"
+                className="mt-2 text-royal-700 dark:text-gold-300"
+              />
+            )}
             <ul className="mt-4 space-y-2 text-sm text-muted">
               <li className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-gold-500" /> {formatDate(event.date)}
+                <CalendarDays className="h-4 w-4 text-gold-700 dark:text-gold-400" /> {formatDate(event.date)}
               </li>
               <li className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gold-500" /> {event.time}
+                <Clock className="h-4 w-4 text-gold-700 dark:text-gold-400" /> {event.time}
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-gold-500" /> {event.venue}
+                <MapPin className="h-4 w-4 text-gold-700 dark:text-gold-400" /> {event.venue}
               </li>
             </ul>
 

@@ -18,7 +18,13 @@ export default function NewsPage() {
         title="What's happening across the province"
         subtitle="Announcements, reflections, testimonies, and highlights from our chapters and provincial team."
       />
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section
+        aria-labelledby="news-list"
+        className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <h2 id="news-list" className="sr-only">
+          News and updates
+        </h2>
         {isVerified("news") ? (
           <NewsBoard />
         ) : (

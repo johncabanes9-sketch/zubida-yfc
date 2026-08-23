@@ -155,7 +155,7 @@ function Info({
 }) {
   return (
     <div className="flex items-start gap-3 rounded-2xl bg-white/60 p-3 dark:bg-white/5">
-      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold-500/15 text-gold-600 dark:text-gold-400">
+      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold-500/15 text-gold-700 dark:text-gold-400">
         {icon}
       </span>
       <div>

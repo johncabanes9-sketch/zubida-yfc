@@ -21,7 +21,13 @@ export default async function LeadersPage() {
         title="The servants behind the mission"
         subtitle="The people who pray, plan, and pour themselves out for the youth of Zamboanga del Sur."
       />
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section
+        aria-labelledby="leaders-list"
+        className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8"
+      >
+        <h2 id="leaders-list" className="sr-only">
+          Leadership directory
+        </h2>
         {leaders.length > 0 ? (
           <LeadersDirectory leaders={leaders} />
         ) : (

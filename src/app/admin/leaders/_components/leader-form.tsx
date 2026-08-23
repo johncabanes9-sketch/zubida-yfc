@@ -1,13 +1,10 @@
 "use client";
+import { fieldClass, labelClass } from "@/components/ui/field";
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createLeader, deleteLeader, updateLeader } from "../actions";
-
-const field =
-  "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
 
 export type LeaderListItem = {
   id: string;
@@ -214,19 +211,19 @@ function LeaderFields({
   return (
     <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
       <label className="block">
-        <span className={label}>Name</span>
-        <input name="name" required defaultValue={leader?.name} className={field} />
+        <span className={labelClass}>Name</span>
+        <input name="name" required defaultValue={leader?.name} className={fieldClass} />
       </label>
 
       <label className="block">
-        <span className={label}>Position</span>
-        <input name="position" required defaultValue={leader?.position} className={field} />
+        <span className={labelClass}>Position</span>
+        <input name="position" required defaultValue={leader?.position} className={fieldClass} />
         <span className="text-xs opacity-70">Free text — whatever title this person actually holds</span>
       </label>
 
       <label className="block">
-        <span className={label}>Chapter</span>
-        <select name="chapter_id" defaultValue={leader?.chapter_id ?? ""} className={field}>
+        <span className={labelClass}>Chapter</span>
+        <select name="chapter_id" defaultValue={leader?.chapter_id ?? ""} className={fieldClass}>
           <option value="">
             {isPYH ? "None — provincial level" : "None — cluster level"}
           </option>
@@ -240,13 +237,13 @@ function LeaderFields({
       </label>
 
       <label className="block">
-        <span className={label}>Message / quote</span>
+        <span className={labelClass}>Message / quote</span>
         <textarea
           name="message"
           rows={3}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          className={field}
+          className={fieldClass}
         />
         <span className="text-xs opacity-70">Leave blank to withhold</span>
       </label>
@@ -261,14 +258,14 @@ function LeaderFields({
       )}
 
       <label className="block">
-        <span className={label}>Facebook URL</span>
-        <input name="facebook_url" type="url" defaultValue={leader?.facebook_url ?? ""} className={field} />
+        <span className={labelClass}>Facebook URL</span>
+        <input name="facebook_url" type="url" defaultValue={leader?.facebook_url ?? ""} className={fieldClass} />
         <span className="text-xs opacity-70">Leave blank to withhold</span>
       </label>
 
       <label className="block">
-        <span className={label}>Instagram URL</span>
-        <input name="instagram_url" type="url" defaultValue={leader?.instagram_url ?? ""} className={field} />
+        <span className={labelClass}>Instagram URL</span>
+        <input name="instagram_url" type="url" defaultValue={leader?.instagram_url ?? ""} className={fieldClass} />
         <span className="text-xs opacity-70">Leave blank to withhold</span>
       </label>
 

@@ -1,4 +1,5 @@
 "use client";
+import { fieldClass, labelClass } from "@/components/ui/field";
 
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
@@ -15,10 +16,6 @@ import {
   updateSectionContent,
   uploadSectionImage,
 } from "../actions";
-
-const field =
-  "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
 
 export type EditorSection = {
   id: string;
@@ -87,17 +84,17 @@ export function PageEditor({
       >
         <h2 className="font-display text-xl font-semibold">Search &amp; sharing</h2>
         <label className="block">
-          <span className={label}>SEO title</span>
-          <input name="seo_title" defaultValue={seoTitle} maxLength={200} className={field} />
+          <span className={labelClass}>SEO title</span>
+          <input name="seo_title" defaultValue={seoTitle} maxLength={200} className={fieldClass} />
         </label>
         <label className="block">
-          <span className={label}>SEO description</span>
+          <span className={labelClass}>SEO description</span>
           <textarea
             name="seo_description"
             rows={2}
             defaultValue={seoDescription}
             maxLength={400}
-            className={field}
+            className={fieldClass}
           />
         </label>
         <div>
@@ -108,11 +105,11 @@ export function PageEditor({
       {/* ── Add a section ── */}
       <div className="glass flex flex-wrap items-end gap-3 rounded-2xl p-6">
         <label className="block">
-          <span className={label}>Add a section</span>
+          <span className={labelClass}>Add a section</span>
           <select
             value={newType}
             onChange={(e) => setNewType(e.target.value)}
-            className={field}
+            className={fieldClass}
           >
             {addable.map((a) => (
               <option key={a.type} value={a.type}>{a.label}</option>
@@ -298,11 +295,11 @@ function FieldInput({
   if (f.kind === "text") {
     return (
       <label className="block">
-        <span className={label}>{f.label}</span>
+        <span className={labelClass}>{f.label}</span>
         <input
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          className={field}
+          className={fieldClass}
         />
       </label>
     );
@@ -311,7 +308,7 @@ function FieldInput({
   if (f.kind === "textarea") {
     return (
       <label className="block">
-        <span className={label}>
+        <span className={labelClass}>
           {f.label}
           {f.optional && <span className="ml-1 font-normal normal-case">(optional)</span>}
         </span>
@@ -319,7 +316,7 @@ function FieldInput({
           rows={3}
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          className={field}
+          className={fieldClass}
         />
       </label>
     );
@@ -329,11 +326,11 @@ function FieldInput({
     const options = f.kind === "icon" ? iconNames : f.options;
     return (
       <label className="block">
-        <span className={label}>{f.label}</span>
+        <span className={labelClass}>{f.label}</span>
         <select
           value={String(value ?? options[0] ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          className={field}
+          className={fieldClass}
         >
           {options.map((o) => (
             <option key={o} value={o}>{o}</option>
@@ -365,7 +362,7 @@ function FieldInput({
   return (
     <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
       <div className="flex items-center justify-between">
-        <span className={label}>{f.label}</span>
+        <span className={labelClass}>{f.label}</span>
         <Button
           size="sm"
           variant="ghost"
@@ -467,7 +464,7 @@ function ImageField({
 
   return (
     <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
-      <span className={label}>{fieldLabel}</span>
+      <span className={labelClass}>{fieldLabel}</span>
 
       {value ? (
         <div className="mt-3 grid gap-3">
@@ -475,12 +472,12 @@ function ImageField({
             <Image src={value.src} alt={value.alt || ""} fill className="object-cover" />
           </div>
           <label className="block">
-            <span className={label}>Alt text</span>
+            <span className={labelClass}>Alt text</span>
             <input
               value={value.alt ?? ""}
               onChange={(e) => onChange({ ...value, alt: e.target.value })}
               placeholder="Describe what the photo shows"
-              className={field}
+              className={fieldClass}
             />
             <span className="mt-1 block text-xs text-muted">
               Read aloud by screen readers. Describe the actual photo — save the

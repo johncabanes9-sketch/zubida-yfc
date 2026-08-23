@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import type { EventItem } from "@/data/types";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, Input, Select } from "@/components/ui/field";
 
 const chapters = [
   "Pagadian City", "Molave", "Labangan", "Aurora", "Tukuran",
@@ -31,11 +32,41 @@ async function postWithRetry(payload: Record<string, unknown>, tries = 3): Promi
   throw new Error("unreachable");
 }
 
+/** Counts required controls that are filled and valid, over the total.
+ *  Read off the live DOM rather than mirrored into state: seventeen fields
+ *  would otherwise mean seventeen controlled inputs and a re-render per
+ *  keystroke, to display one number. */
+function completion(form: HTMLFormElement): { done: number; total: number } {
+  const required = form.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[required]");
+  let done = 0;
+  for (const el of required) {
+    const filled =
+      el instanceof HTMLInputElement && el.type === "checkbox"
+        ? el.checked
+        : el.value.trim() !== "";
+    if (filled && el.validity.valid) done++;
+  }
+  return { done, total: required.length };
+}
+
 export function RegistrationForm({ event }: { event: EventItem }) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Success | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const recount = useCallback(() => {
+    if (formRef.current) setProgress(completion(formRef.current));
+  }, []);
+
+  // Count once on mount. Without this the bar reads "0 of 0 required fields"
+  // until the first keystroke, because nothing has fired an input event yet —
+  // and a total of zero is exactly the number a reader should not be shown.
+  useEffect(() => {
+    recount();
+  }, [recount]);
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -84,7 +115,7 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         animate={{ opacity: 1, y: 0 }}
         className="p-8 text-center"
       >
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success-50 text-success-700 dark:bg-success-300/15 dark:text-success-300">
           <CheckCircle2 className="h-9 w-9" />
         </div>
         <h3 className="mt-5 font-display text-2xl font-semibold">You&apos;re registered!</h3>
@@ -104,7 +135,7 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         </div>
 
         <div className="mx-auto mt-6 flex max-w-sm items-start gap-2 rounded-2xl bg-royal-700/8 p-4 text-left text-sm text-muted dark:bg-white/5">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-royal-600 dark:text-gold-300" />
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-royal-700 dark:text-gold-300" />
           <span>
             You can check your approval status anytime at{" "}
             <a href="/registration-status" className="font-semibold text-royal-700 underline dark:text-gold-300">
@@ -117,58 +148,149 @@ export function RegistrationForm({ event }: { event: EventItem }) {
     );
   }
 
+  const pct = progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
+  const complete = progress.total > 0 && progress.done === progress.total;
+
   return (
-    <form onSubmit={submit} className="space-y-5 p-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Full name" required><input {...inp} name="fullName" required /></Field>
-        <Field label="Nickname"><input {...inp} name="nickname" /></Field>
-        <Field label="Birthdate" required><input {...inp} type="date" name="birthdate" required /></Field>
-        <Field label="Age" required><input {...inp} type="number" min={10} max={40} name="age" required /></Field>
-        <Field label="Gender">
-          <select {...inp} name="gender" defaultValue="">
-            <option value="" disabled>Select…</option>
-            <option>Male</option><option>Female</option><option>Prefer not to say</option>
-          </select>
-        </Field>
-        <Field label="Email" required><input {...inp} type="email" name="email" required /></Field>
-        <Field label="Phone number" required><input {...inp} type="tel" name="phone" required /></Field>
-        <Field label="Chapter" required>
-          <select {...inp} name="chapter" required defaultValue="">
-            <option value="" disabled>Select chapter…</option>
-            {chapters.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </Field>
-        <Field label="Cluster"><input {...inp} name="cluster" placeholder="e.g. Bay Cluster" /></Field>
-        <Field label="Parish"><input {...inp} name="parish" /></Field>
-        <Field label="School"><input {...inp} name="school" /></Field>
-        <Field label="T-shirt size">
-          <select {...inp} name="shirt" defaultValue="">
-            <option value="" disabled>Select…</option>
-            {shirtSizes.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </Field>
-        <Field label="Emergency contact" required><input {...inp} name="emContact" required /></Field>
-        <Field label="Emergency number" required><input {...inp} type="tel" name="emNumber" required /></Field>
-        <Field label="Medical concerns"><input {...inp} name="medical" placeholder="None" /></Field>
-        <Field label="Food restrictions"><input {...inp} name="food" placeholder="None" /></Field>
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      onInput={recount}
+      onChange={recount}
+      className="space-y-7 p-6"
+    >
+      {/* Seventeen fields in one flat block is the thing that made this form feel
+          long. Grouping them, and saying how much is left, is most of the fix. */}
+      <div>
+        <div className="mb-1.5 flex items-baseline justify-between text-xs">
+          <span className="font-semibold uppercase tracking-wide text-muted">
+            Registration progress
+          </span>
+          <span
+            aria-live="polite"
+            className={
+              complete
+                ? "font-semibold text-success-700 dark:text-success-300"
+                : "font-semibold text-muted"
+            }
+          >
+            {complete
+              ? "All set — you can submit"
+              : `${progress.done} of ${progress.total} required fields`}
+          </span>
+        </div>
+        <div
+          role="progressbar"
+          aria-valuenow={progress.done}
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-label="Required fields completed"
+          className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--chart-track)]"
+        >
+          <div
+            className="h-full rounded-full transition-[width] duration-300"
+            style={{
+              width: `${pct}%`,
+              backgroundColor: complete ? "var(--chart-approved)" : "var(--chart-primary)",
+            }}
+          />
+        </div>
       </div>
 
-      <label className="flex items-center gap-3 rounded-2xl bg-white/60 p-3 text-sm dark:bg-white/5">
-        <input
-          type="checkbox"
-          name="transport"
-          className="h-4 w-4 accent-royal-700"
-        />
-        I need transportation to the venue
-      </label>
+      <FieldGroup title="About you">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Full name" required>
+            <Input name="fullName" required autoComplete="name" />
+          </Field>
+          <Field label="Nickname">
+            <Input name="nickname" autoComplete="nickname" />
+          </Field>
+          <Field label="Birthdate" required>
+            <Input type="date" name="birthdate" required autoComplete="bday" />
+          </Field>
+          <Field label="Age" required>
+            <Input type="number" min={10} max={40} name="age" required />
+          </Field>
+          <Field label="Gender">
+            <Select name="gender" defaultValue="">
+              <option value="" disabled>Select…</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Prefer not to say</option>
+            </Select>
+          </Field>
+          <Field label="T-shirt size">
+            <Select name="shirt" defaultValue="">
+              <option value="" disabled>Select…</option>
+              {shirtSizes.map((s) => <option key={s}>{s}</option>)}
+            </Select>
+          </Field>
+        </div>
+      </FieldGroup>
 
-      <label className="flex items-start gap-3 rounded-2xl bg-white/60 p-4 text-sm dark:bg-white/5">
+      <FieldGroup title="How we reach you">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Email" required>
+            <Input type="email" name="email" required autoComplete="email" />
+          </Field>
+          <Field label="Phone number" required>
+            <Input type="tel" name="phone" required autoComplete="tel" />
+          </Field>
+          <Field label="Chapter" required>
+            <Select name="chapter" required defaultValue="">
+              <option value="" disabled>Select chapter…</option>
+              {chapters.map((c) => <option key={c}>{c}</option>)}
+            </Select>
+          </Field>
+          <Field label="Cluster">
+            <Input name="cluster" placeholder="e.g. Bay Cluster" />
+          </Field>
+          <Field label="Parish">
+            <Input name="parish" />
+          </Field>
+          <Field label="School">
+            <Input name="school" />
+          </Field>
+        </div>
+      </FieldGroup>
+
+      <FieldGroup
+        title="In case of emergency"
+        description="Someone we can call on the day if we need to, and anything we should know to keep you safe."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Emergency contact" required>
+            <Input name="emContact" required />
+          </Field>
+          <Field label="Emergency number" required>
+            <Input type="tel" name="emNumber" required />
+          </Field>
+          <Field label="Medical concerns">
+            <Input name="medical" placeholder="None" />
+          </Field>
+          <Field label="Food restrictions">
+            <Input name="food" placeholder="None" />
+          </Field>
+        </div>
+
+        <label className="flex min-h-[44px] items-center gap-3 rounded-2xl bg-[var(--surface-2)] p-3 text-sm">
+          <input
+            type="checkbox"
+            name="transport"
+            className="h-4 w-4 rounded accent-royal-700 dark:accent-gold-400"
+          />
+          I need transportation to the venue
+        </label>
+      </FieldGroup>
+
+      <label className="flex items-start gap-3 rounded-2xl bg-[var(--surface-2)] p-4 text-sm">
         <input
           type="checkbox"
+          name="consent"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
           required
-          className="mt-0.5 h-4 w-4 accent-royal-700"
+          className="mt-0.5 h-4 w-4 rounded accent-royal-700 dark:accent-gold-400"
         />
         <span>
           I consent to Zubida YFC collecting this information for event
@@ -178,18 +300,16 @@ export function RegistrationForm({ event }: { event: EventItem }) {
       </label>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-400">
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-2xl bg-danger-50 p-4 text-sm text-danger-700 dark:bg-danger-300/15 dark:text-danger-300"
+        >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full"
-        disabled={submitting || !consent}
-      >
+      <Button type="submit" size="lg" className="w-full" disabled={submitting || !consent}>
         {submitting ? (
           <><Loader2 className="h-4 w-4 animate-spin" /> Reserving your slot…</>
         ) : (
@@ -201,30 +321,5 @@ export function RegistrationForm({ event }: { event: EventItem }) {
         a confirmation email.
       </p>
     </form>
-  );
-}
-
-const inp = {
-  className:
-    "w-full rounded-xl border border-black/10 bg-white/70 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-royal-500 dark:border-white/10 dark:bg-midnight-800",
-};
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-muted">
-        {label}
-        {required && <span className="text-gold-600"> *</span>}
-      </span>
-      {children}
-    </label>
   );
 }

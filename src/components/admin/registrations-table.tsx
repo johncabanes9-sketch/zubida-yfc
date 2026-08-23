@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Download } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Download, Inbox } from "lucide-react";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import { setStatus } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
+import { Badge, toneForStatus } from "@/components/ui/badge";
+import { DataTable, nextSort, type Column, type SortState } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/field";
 
 export type Row = {
   registration_id: string;
@@ -15,16 +19,15 @@ export type Row = {
   created_at: string;
 };
 
-const badge: Record<string, string> = {
-  pending: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  approved: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  rejected: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-  cancelled: "bg-slate-500/15 text-slate-500",
-};
+/** Kept in sync with the server page's TABLE_PAGE_SIZE — the realtime refetch
+ *  must not quietly widen the window the server rendered. */
+const PAGE_SIZE = 200;
 
 export function RegistrationsTable({ initial }: { initial: Row[] }) {
   const [rows, setRows] = useState<Row[]>(initial);
   const [pending, startTransition] = useTransition();
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortState>({ key: "created_at", direction: "desc" });
 
   useEffect(() => {
     const supabase = createBrowserSupabase();
@@ -34,11 +37,15 @@ export function RegistrationsTable({ initial }: { initial: Row[] }) {
         .select("registration_id, full_name, email, chapter, status, created_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(200)
+        .limit(PAGE_SIZE)
         .then(({ data }) => data && setRows(data as Row[]));
     const channel = supabase
       .channel("admin-registrations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "event_registrations" }, refetch)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "event_registrations" },
+        refetch,
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -52,9 +59,30 @@ export function RegistrationsTable({ initial }: { initial: Row[] }) {
       await setStatus(id, status);
     });
 
+  // Search and sort are client-side over the rows already loaded. That is a
+  // deliberate limit, not an oversight: the server sends the most recent
+  // PAGE_SIZE and the header above the table says so, rather than this box
+  // implying it can reach registrations that were never fetched.
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const matched = q
+      ? rows.filter((r) =>
+          [r.full_name, r.email, r.chapter, r.registration_id].some((v) =>
+            v.toLowerCase().includes(q),
+          ),
+        )
+      : rows;
+
+    const dir = sort.direction === "asc" ? 1 : -1;
+    return [...matched].sort((a, b) => {
+      const key = sort.key as keyof Row;
+      return String(a[key]).localeCompare(String(b[key]), "en", { numeric: true }) * dir;
+    });
+  }, [rows, query, sort]);
+
   const exportCsv = () => {
     const header = "registration_id,full_name,email,chapter,status,created_at\n";
-    const body = rows
+    const body = visible
       .map((r) =>
         [r.registration_id, r.full_name, r.email, r.chapter, r.status, r.created_at]
           .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -69,69 +97,111 @@ export function RegistrationsTable({ initial }: { initial: Row[] }) {
     URL.revokeObjectURL(url);
   };
 
+  const columns: Column<Row>[] = [
+    {
+      key: "full_name",
+      header: "Name",
+      sortable: true,
+      primary: true,
+      cell: (r) => (
+        <>
+          <span className="block font-medium text-[var(--fg)]">{r.full_name}</span>
+          <span className="block text-xs text-muted">{r.email}</span>
+          <span className="mt-0.5 block font-mono text-[11px] text-muted sm:hidden">
+            {r.registration_id}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: "registration_id",
+      header: "ID",
+      sortable: true,
+      hideOnCard: true,
+      cell: (r) => <span className="font-mono text-xs text-muted">{r.registration_id}</span>,
+      className: "w-40",
+    },
+    { key: "chapter", header: "Chapter", sortable: true, cell: (r) => r.chapter },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      cell: (r) => <Badge tone={toneForStatus(r.status)}>{r.status}</Badge>,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      actions: true,
+      align: "right",
+      cell: (r) => (
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button
+            size="xs"
+            variant="subtle"
+            disabled={pending || r.status === "approved"}
+            onClick={() => act(r.registration_id, "approved")}
+            className="flex-1 sm:flex-none"
+          >
+            Approve
+          </Button>
+          <Button
+            size="xs"
+            variant="danger"
+            disabled={pending || r.status === "rejected"}
+            onClick={() => act(r.registration_id, "rejected")}
+            className="flex-1 sm:flex-none"
+          >
+            Reject
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-muted">{rows.length} registrations</p>
-        <Button variant="outline" size="sm" onClick={exportCsv}>
-          <Download className="h-4 w-4" /> Export CSV
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search name, email, chapter or ID"
+          aria-label="Search the loaded registrations"
+          className="mt-0 w-full sm:w-72"
+        />
+        <p className="text-sm text-muted" aria-live="polite">
+          {visible.length === rows.length
+            ? `${rows.length} registrations`
+            : `${visible.length} of ${rows.length} match`}
+        </p>
+        <Button variant="outline" size="sm" onClick={exportCsv} className="ml-auto">
+          <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
         </Button>
       </div>
-      <div className="glass overflow-x-auto rounded-2xl">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="text-left text-muted">
-            <tr className="border-b border-black/5 dark:border-white/10">
-              <th className="p-3 font-medium">ID</th>
-              <th className="p-3 font-medium">Name</th>
-              <th className="p-3 font-medium">Chapter</th>
-              <th className="p-3 font-medium">Status</th>
-              <th className="p-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.registration_id} className="border-t border-black/5 dark:border-white/10">
-                <td className="p-3 font-mono text-xs">{r.registration_id}</td>
-                <td className="p-3">
-                  <div>{r.full_name}</div>
-                  <div className="text-xs text-muted">{r.email}</div>
-                </td>
-                <td className="p-3">{r.chapter}</td>
-                <td className="p-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${badge[r.status] ?? ""}`}>
-                    {r.status}
-                  </span>
-                </td>
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <button
-                      disabled={pending || r.status === "approved"}
-                      onClick={() => act(r.registration_id, "approved")}
-                      className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-600 disabled:opacity-40"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      disabled={pending || r.status === "rejected"}
-                      onClick={() => act(r.registration_id, "rejected")}
-                      className="rounded-full bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-600 disabled:opacity-40"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-10 text-center text-muted">
-                  No registrations yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+
+      <DataTable
+        rows={visible}
+        columns={columns}
+        rowKey={(r) => r.registration_id}
+        caption="Event registrations, with approve and reject actions"
+        sort={sort}
+        onSortChange={(key) => setSort((s) => nextSort(s, key))}
+        empty={
+          query ? (
+            <EmptyState
+              icon={Inbox}
+              title="No matches"
+              description={`Nothing in the loaded registrations matches "${query}".`}
+            />
+          ) : (
+            <EmptyState
+              icon={Inbox}
+              title="No registrations yet"
+              description="Registrations appear here as soon as someone signs up for an event."
+            />
+          )
+        }
+      />
     </div>
   );
 }

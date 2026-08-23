@@ -1,4 +1,5 @@
 "use client";
+import { fieldClass, labelClass } from "@/components/ui/field";
 
 import { useRef, useState, useTransition } from "react";
 import Image from "next/image";
@@ -12,10 +13,6 @@ import {
   updateChapter,
   uploadChapterCover,
 } from "../actions";
-
-const field =
-  "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
 
 export type ChapterListItem = {
   id: string;
@@ -205,13 +202,13 @@ function ChapterFields({
   return (
     <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
       <label className="block">
-        <span className={label}>Name</span>
-        <input name="name" required defaultValue={chapter?.name} className={field} />
+        <span className={labelClass}>Name</span>
+        <input name="name" required defaultValue={chapter?.name} className={fieldClass} />
       </label>
 
       <label className="block">
-        <span className={label}>Municipality</span>
-        <input name="municipality" required defaultValue={chapter?.municipality} className={field} />
+        <span className={labelClass}>Municipality</span>
+        <input name="municipality" required defaultValue={chapter?.municipality} className={fieldClass} />
       </label>
 
       {chapter ? (
@@ -220,8 +217,8 @@ function ChapterFields({
         </p>
       ) : (
         <label className="block">
-          <span className={label}>Cluster</span>
-          <select name="cluster_id" required defaultValue="" className={field}>
+          <span className={labelClass}>Cluster</span>
+          <select name="cluster_id" required defaultValue="" className={fieldClass}>
             <option value="" disabled>
               Choose a cluster
             </option>
@@ -235,14 +232,14 @@ function ChapterFields({
       )}
 
       <label className="block">
-        <span className={label}>Coordinator</span>
-        <input name="coordinator" defaultValue={chapter?.coordinator ?? ""} className={field} />
+        <span className={labelClass}>Coordinator</span>
+        <input name="coordinator" defaultValue={chapter?.coordinator ?? ""} className={fieldClass} />
         <span className="text-xs opacity-70">Leave blank to withhold</span>
       </label>
 
       <label className="block">
-        <span className={label}>Meeting schedule</span>
-        <input name="schedule" defaultValue={chapter?.schedule ?? ""} className={field} />
+        <span className={labelClass}>Meeting schedule</span>
+        <input name="schedule" defaultValue={chapter?.schedule ?? ""} className={fieldClass} />
         <span className="text-xs opacity-70">Leave blank to withhold</span>
       </label>
 
@@ -291,7 +288,7 @@ function CoverField({
 
   return (
     <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
-      <span className={label}>Cover image</span>
+      <span className={labelClass}>Cover image</span>
 
       {src ? (
         <div className="mt-3 grid gap-3">

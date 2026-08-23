@@ -1,14 +1,11 @@
 "use client";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import Image from "next/image";
 import { useEffect, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { deleteEventImage, reorderEventImage, uploadEventImages } from "../actions";
 import { ALLOWED_MIME, MAX_BYTES, MAX_FILES } from "@/lib/images/validate";
 
 export type EventImageRow = { id: string; url: string; alt: string | null };
-
-const field =
-  "mt-1 w-full rounded-xl border border-black/10 bg-white/60 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5";
-const label = "text-xs font-semibold uppercase tracking-wide text-muted";
 
 type Preview = { url: string; name: string };
 
@@ -70,11 +67,11 @@ export function EventImagesManager({
 
   return (
     <div className="glass mt-6 grid max-w-2xl gap-4 rounded-2xl p-6">
-      <h2 className={label}>Event images</h2>
+      <h2 className={labelClass}>Event images</h2>
 
       <form onSubmit={handleUpload} className="grid gap-3">
         <label className="block">
-          <span className={label}>
+          <span className={labelClass}>
             Upload images (up to {MAX_FILES}, {MAX_BYTES / 1024 / 1024}MB max each)
           </span>
           <input
@@ -83,7 +80,7 @@ export function EventImagesManager({
             multiple
             accept={ALLOWED_MIME.join(",")}
             onChange={handleFilesChange}
-            className={field}
+            className={fieldClass}
           />
         </label>
 

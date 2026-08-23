@@ -1,4 +1,5 @@
 "use client";
+import { fieldClass } from "@/components/ui/field";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -44,20 +45,20 @@ export function ContactForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-muted">Name *</span>
-          <input required className={field} name="name" />
+          <input required className={fieldClass} name="name" />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-muted">Email *</span>
-          <input required type="email" className={field} name="email" />
+          <input required type="email" className={fieldClass} name="email" />
         </label>
       </div>
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-muted">Subject</span>
-        <input className={field} name="subject" />
+        <input className={fieldClass} name="subject" />
       </label>
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-muted">Message *</span>
-        <textarea required rows={5} className={`${field} resize-none`} name="message" />
+        <textarea required rows={5} className={`${fieldClass} resize-none`} name="message" />
       </label>
       <Button type="submit" size="lg" className="w-full" disabled={sending}>
         {sending ? (
@@ -70,5 +71,3 @@ export function ContactForm() {
   );
 }
 
-const field =
-  "w-full rounded-xl border border-black/10 bg-white/70 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-royal-500 dark:border-white/10 dark:bg-midnight-800";

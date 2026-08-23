@@ -42,7 +42,7 @@ export function NewsCard({ item, delay = 0 }: { item: NewsItem; delay?: number }
           </p>
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs font-medium text-muted">By {item.author}</span>
-            <span className="flex items-center gap-1 text-sm font-semibold text-royal-700 transition-colors group-hover:text-gold-600 dark:text-gold-300">
+            <span className="flex items-center gap-1 text-sm font-semibold text-royal-700 transition-colors group-hover:text-gold-700 dark:text-gold-300 dark:group-hover:text-gold-200">
               Read <ArrowUpRight className="h-4 w-4" />
             </span>
           </div>
