@@ -446,5 +446,33 @@ check(
   null,
 );
 
+
+// -- 5. Every field the registration payload reads is actually submitted ------
+// A control with no `name` is omitted from FormData entirely, so `fd.get(...)`
+// returns null and the payload silently carries a wrong value. That is exactly
+// how the consent checkbox shipped: unnamed, so the payload always said
+// consent:false, which registrationSchema rejects with "Consent is required" --
+// the public registration form could not be submitted at all. Nothing failed
+// loudly, because the read succeeded and simply returned nothing.
+const regForm = code("src/components/shared/registration-form.tsx");
+// Injected into the form by the Turnstile widget script, not rendered by us.
+const NOT_OURS = new Set(["cf-turnstile-response"]);
+const readKeys = [...regForm.matchAll(/fd\.get\("([^"]+)"\)/g)]
+  .map((m) => m[1])
+  .filter((k) => !NOT_OURS.has(k));
+const namedControls = new Set([...regForm.matchAll(/name="([^"]+)"/g)].map((m) => m[1]));
+check("the registration form reads at least ten fields", readKeys.length >= 10, readKeys.length);
+const unsubmitted = [...new Set(readKeys)].filter((k) => !namedControls.has(k));
+check(
+  "every field the registration payload reads has a named control",
+  unsubmitted.length === 0,
+  unsubmitted,
+);
+check(
+  "the consent checkbox is named, so consent:true can ever be sent",
+  namedControls.has("consent"),
+  [...namedControls].filter((n) => n.includes("consent")),
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

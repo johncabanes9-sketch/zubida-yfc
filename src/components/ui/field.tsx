@@ -19,7 +19,9 @@ const controlBase =
   "placeholder:text-neutral-400 dark:placeholder:text-neutral-500 " +
   "hover:border-[var(--rule-strong)] " +
   "focus:border-royal-500 focus:ring-2 focus:ring-royal-500/25 dark:focus:border-gold-400 dark:focus:ring-gold-400/25 " +
-  "disabled:cursor-not-allowed disabled:opacity-60";
+  "disabled:cursor-not-allowed disabled:opacity-60 " +
+  "[&:user-invalid]:border-danger-500 [&:user-invalid]:focus:border-danger-500 " +
+  "dark:[&:user-invalid]:border-danger-300";
 
 /**
  * The same control styling as a raw class string.
