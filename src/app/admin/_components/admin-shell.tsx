@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs, type Crumb } from "@/components/ui/breadcrumbs";
 import { cn } from "@/lib/utils";
 import { AdminMobileNav } from "./admin-mobile-nav";
-import { NAV_GROUPS, visibleNavItems, type Tab } from "./admin-nav";
+import { NAV_GROUPS, NAV_ICONS, visibleNavItems, type Tab } from "./admin-nav";
 
 export type { Tab };
 
@@ -72,6 +72,7 @@ export function AdminShell({
                     <ul className="space-y-0.5">
                       {groupItems.map((item) => {
                         const isActive = item.key === active;
+                        const Icon = NAV_ICONS[item.key];
                         return (
                           <li key={item.key}>
                             <Link
@@ -93,7 +94,7 @@ export function AdminShell({
                                   isActive ? "bg-royal-700 dark:bg-gold-400" : "bg-transparent",
                                 )}
                               />
-                              <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
                               {item.label}
                             </Link>
                           </li>

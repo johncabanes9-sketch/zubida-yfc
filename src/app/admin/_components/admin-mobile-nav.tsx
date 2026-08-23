@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { NAV_GROUPS, type NavItem, type Tab } from "./admin-nav";
+import { NAV_GROUPS, NAV_ICONS, type NavItem, type Tab } from "./admin-nav";
 import { cn } from "@/lib/utils";
 
 /**
@@ -137,7 +137,9 @@ export function AdminMobileNav({
                       {group}
                     </p>
                     <ul className="space-y-1">
-                      {groupItems.map((item) => (
+                      {groupItems.map((item) => {
+                        const Icon = NAV_ICONS[item.key];
+                        return (
                         <li key={item.key}>
                           <Link
                             href={item.href}
@@ -150,11 +152,12 @@ export function AdminMobileNav({
                                 : "text-muted hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
                             )}
                           >
-                            <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                            <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
                             {item.label}
                           </Link>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   </div>
                 );

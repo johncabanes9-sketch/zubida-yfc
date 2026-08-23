@@ -15,9 +15,20 @@ export function TrendBars({
   data,
   caption,
 }: {
-  data: readonly DayBucket[];
+  /** null when the query failed. A failed read and a quiet month look identical
+   *  on an empty chart, and only one of them is the truth — so they get
+   *  different words, the same way the stat tiles say "Unavailable". */
+  data: readonly DayBucket[] | null;
   caption: string;
 }) {
+  if (data === null) {
+    return (
+      <p className="flex h-32 items-center justify-center text-sm text-muted">
+        This chart is unavailable right now.
+      </p>
+    );
+  }
+
   const max = Math.max(1, ...data.map((d) => d.count));
   const total = data.reduce((sum, d) => sum + d.count, 0);
 

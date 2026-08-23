@@ -125,9 +125,11 @@ export default async function AdminDashboard() {
   const trendStamps = ((trendRows.data as { created_at: string }[] | null) ?? []).map(
     (r) => r.created_at,
   );
-  const series = bucketByDay(trendStamps, TREND_DAYS);
+  // A failed read must not masquerade as "nothing happened this month".
+  const series = trendRows.error ? null : bucketByDay(trendStamps, TREND_DAYS);
   const windowTotal = trendCount.count ?? 0;
   const trendIsPartial = windowTotal > trendStamps.length;
+  const eventsUnavailable = Boolean(events.error);
   const upcoming = (events.data as EventLite[] | null) ?? [];
   const activity = (logs.data as LogLite[] | null) ?? [];
 
@@ -186,7 +188,7 @@ export default async function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader
             title="Upcoming events"
@@ -200,8 +202,12 @@ export default async function AdminDashboard() {
           {upcoming.length === 0 ? (
             <EmptyState
               icon={CalendarPlus}
-              title="No upcoming events"
-              description="Events dated from today onward appear here with their capacity."
+              title={eventsUnavailable ? "Upcoming events are unavailable" : "No upcoming events"}
+              description={
+                eventsUnavailable
+                  ? "The events could not be read just now. Nothing has been deleted — try again shortly."
+                  : "Events dated from today onward appear here with their capacity."
+              }
               action={
                 <ButtonLink href="/admin/events/new" size="sm">
                   Create an event
