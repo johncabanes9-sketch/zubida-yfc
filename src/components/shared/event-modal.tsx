@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays,
@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RegistrationForm } from "./registration-form";
 import { EventCarousel } from "./event-carousel";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export function EventModal({
   event,
@@ -29,6 +30,11 @@ export function EventModal({
 }) {
   const [tab, setTab] = useState<"details" | "register">("details");
   const [shared, setShared] = useState(false);
+
+  // The overlay only closed on click, which left keyboard users with no way out
+  // and let Tab wander behind the dialog into the page underneath.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef, onClose);
 
   const share = async () => {
     const url =
@@ -61,7 +67,14 @@ export function EventModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.98 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            ref={panelRef}
             onClick={(e) => e.stopPropagation()}
+            // The registration form lives in here, so without dialog semantics the
+            // whole registration surface is invisible to assistive tech — and to
+            // prove:a11y, which cannot open this modal without an event to open.
+            role="dialog"
+            aria-modal="true"
+            aria-label={event.name}
             className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-cream shadow-soft dark:bg-midnight-900 sm:rounded-3xl"
           >
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-black/5 bg-cream/90 px-6 py-4 backdrop-blur dark:border-white/10 dark:bg-midnight-900/90">
