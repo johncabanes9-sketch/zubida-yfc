@@ -18,6 +18,7 @@
     "prove:metrics": "node --experimental-strip-types scripts/prove-metrics.mjs",
     "prove:editor": "node scripts/prove-editor.mjs",
     "prove:a11y": "node scripts/prove-a11y.mjs",
+    "prove:registration": "node scripts/prove-registration.mjs",
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
     "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs"
   },

@@ -84,7 +84,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 95 assertions — needs no database
+npm run prove:content      # 101 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
@@ -93,6 +93,7 @@ npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
 npm run prove:editor       # 41 — the /admin/pages editing loop, in a real browser
 npm run prove:a11y         # 64 — the public accessibility floor, in a real browser
+npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 ```
@@ -102,7 +103,24 @@ The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
 
-`prove:editor` and `prove:a11y` are the two suites that drive a browser.
+`prove:registration` walks the one path no other suite covers: a member filling
+in the public form and getting a slot. `prove:behaviors` and `prove:concurrency`
+call `register_for_event()` directly, so they never build a `FormData`, and
+`prove:content` only greps the markup — which is how the consent checkbox
+shipped without a `name`, making the form unsubmittable while every suite, and
+`tsc`, `lint` and `build`, stayed green. It creates its own event, registers
+through the real modal, and hard-deletes the event in a `finally`; a crashed run
+is swept on the next start, or by `npm run prove:registration -- --cleanup-only`.
+It also carries the event modal's accessibility assertions, which `prove:a11y`
+cannot reach: that suite runs without a database, so no event exists to open.
+
+Note it exercises the captcha's **degraded** branch, because `TURNSTILE_SECRET_KEY`
+is unset locally. Set that variable only together with
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` — the secret alone rejects every registration,
+since no widget renders and no token is ever submitted. The route logs loudly if
+you do it anyway.
+
+`prove:editor`, `prove:a11y` and `prove:registration` are the suites that drive a browser.
 `prove:a11y` needs no database — it audits the public pages at a 390px viewport
 for landmarks, heading order, image alts, accessible names, the WCAG 2.5.8
 24px target floor, and a visible focus ring. `prove:editor` is the only suite
