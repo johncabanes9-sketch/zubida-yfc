@@ -663,6 +663,29 @@ check(
   null,
 );
 
+// -- 4f. An event with no cover renders no broken image ---------------------
+// events.cover is nullable (0001) but EventItem declared `cover: string`, and
+// the loader laundered the null into "" to satisfy it. Nobody guarded the
+// render, because the type said there was nothing to guard — so an event
+// without a cover reached <Image src=""> and logged two console errors on
+// every page that listed it. The type has to be honest before the guard can
+// be obviously necessary.
+check(
+  "EventItem admits that an event may have no cover",
+  /cover:\s*string\s*\|\s*null/.test(code("src/data/types.ts")),
+  null,
+);
+check(
+  "the events loader does not launder a missing cover into an empty string",
+  !/cover:\s*e\.cover\s*\?\?\s*""/.test(code("src/lib/data/events.ts")),
+  null,
+);
+check(
+  "the event card renders no image when there is no cover",
+  /\{\s*event\.cover\s*&&/.test(code("src/components/shared/event-card.tsx")),
+  null,
+);
+
 const optionActions = code("src/app/admin/settings/actions.ts");
 check(
   "adding an option requires the PYH",

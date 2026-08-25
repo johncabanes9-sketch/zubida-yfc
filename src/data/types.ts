@@ -6,7 +6,10 @@ export type EventImage = { url: string; alt: string };
 export interface EventItem {
   id: string;
   name: string;
-  cover: string;
+  /** Nullable because events.cover is (0001), and an admin may publish an
+   *  event before there is artwork for it. Declaring it `string` is what let
+   *  the loader launder a null into "" and hand <Image> an empty src. */
+  cover: string | null;
   date: string; // ISO
   time: string;
   venue: string;
