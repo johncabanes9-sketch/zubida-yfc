@@ -184,6 +184,16 @@ export interface NavItemRow {
   visible: boolean;
 }
 
+/** A value in one of the registration form's editable dropdowns (0030).
+ *  `list_key` is constrained to 'gender' | 'shirt_size' by the table. */
+export interface OptionListRow {
+  id: string;
+  list_key: string;
+  value: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface PageRow {
   id: string;
   slug: string;

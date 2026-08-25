@@ -20,6 +20,24 @@ const phone = z
   .refine((v) => (v.match(/\d/g) ?? []).length >= 7, "Phone number needs at least 7 digits")
   .or(z.literal(""));
 
+/** One value added to a registration dropdown.
+ *
+ *  `list_key` is held to the same two keys the table's check constraint allows,
+ *  so a tampered form field is refused in the action rather than reaching the
+ *  database. The value is trimmed before the length check — a name of spaces is
+ *  blank, and the table refuses it too. 40 characters is generous for a shirt
+ *  size and short enough to render in a dropdown without breaking the layout. */
+export const registrationOptionSchema = z.object({
+  list_key: z.enum(["gender", "shirt_size"]),
+  value: z
+    .string()
+    .trim()
+    .min(1, "An option cannot be blank")
+    .max(40, "An option must be 40 characters or fewer"),
+});
+
+export type RegistrationOptionInput = z.infer<typeof registrationOptionSchema>;
+
 export const siteSettingsSchema = z.object({
   name: z.string().min(1).max(80),
   full_name: z.string().min(1).max(160),

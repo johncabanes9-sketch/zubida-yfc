@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarX, CloudOff } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import type { RegistrationOptionLists } from "@/lib/constants";
 import { EventCard } from "@/components/shared/event-card";
 import { cn } from "@/lib/utils";
 
@@ -11,9 +12,12 @@ type ScopeFilter = "All" | "Provincial" | "Chapter";
 
 export function EventsBoard({
   events,
+  options,
   status = "ok",
 }: {
   events: EventItem[];
+  /** Fetched by the page and passed through to each card's registration form. */
+  options?: RegistrationOptionLists;
   /** `unavailable` means the schedule could not be loaded — say so rather than
    *  showing "no events", which would assert something we do not know. */
   status?: "ok" | "unavailable";
@@ -85,7 +89,7 @@ export function EventsBoard({
       ) : filtered.length > 0 ? (
         <div className="grid gap-7 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((e, i) => (
-            <EventCard key={e.id} event={e} delay={(i % 3) * 0.1} />
+            <EventCard key={e.id} event={e} options={options} delay={(i % 3) * 0.1} />
           ))}
         </div>
       ) : (

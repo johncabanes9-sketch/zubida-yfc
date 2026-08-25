@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { CalendarDays, Clock, MapPin, Users } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import type { RegistrationOptionLists } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "./event-modal";
@@ -13,7 +14,16 @@ import { Countdown } from "@/components/events/countdown";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { share } from "@/lib/admin/metrics";
 
-export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: number }) {
+export function EventCard({
+  event,
+  options,
+  delay = 0,
+}: {
+  event: EventItem;
+  /** Passed through to the registration form inside the modal. */
+  options?: RegistrationOptionLists;
+  delay?: number;
+}) {
   const [open, setOpen] = useState(false);
   // share() guards the divide-by-zero. An event with no cap used to compute
   // 0/0 here, which rendered as `width: NaN%` — an invalid declaration the
@@ -111,7 +121,7 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
         </article>
       </Reveal>
 
-      <EventModal event={event} open={open} onClose={() => setOpen(false)} />
+      <EventModal event={event} options={options} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

@@ -28,6 +28,27 @@ export const SITE = {
   },
 };
 
+/** The registration form's two pure value lists, and the DB-outage fallback
+ *  for them. Migration 0030 seeds `option_lists` from exactly these, so the
+ *  form offers the same choices whether or not the database answers. Nothing
+ *  branches on these values — registrations store them as plain text — which
+ *  is what makes them safe for the PYH to edit in /admin/settings. */
+export const REGISTRATION_OPTIONS = {
+  gender: ["Male", "Female", "Prefer not to say"],
+  shirt_size: ["XS", "S", "M", "L", "XL", "2XL", "3XL"],
+} as const;
+
+export type OptionListKey = keyof typeof REGISTRATION_OPTIONS;
+export type RegistrationOptionLists = Record<OptionListKey, string[]>;
+
+/** Mutable copy of the built-ins, shared by the server loader's fallback and
+ *  the form's default prop so there is exactly one definition of "the built-in
+ *  list" to keep in step with the 0030 seed. */
+export const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptionLists = {
+  gender: [...REGISTRATION_OPTIONS.gender],
+  shirt_size: [...REGISTRATION_OPTIONS.shirt_size],
+};
+
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },

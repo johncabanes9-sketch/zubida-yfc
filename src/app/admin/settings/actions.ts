@@ -2,13 +2,18 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, requirePYH } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { siteSettingsSchema } from "@/lib/validation/site";
+import { siteSettingsSchema, registrationOptionSchema } from "@/lib/validation/site";
 
-async function audit(userId: string, action: string) {
+async function audit(
+  userId: string,
+  action: string,
+  entity = "site_settings",
+  entityId = "1",
+) {
   try {
     await createServiceClient()
       .from("audit_log")
-      .insert({ actor_user_id: userId, action, entity: "site_settings", entity_id: "1" });
+      .insert({ actor_user_id: userId, action, entity, entity_id: entityId });
   } catch {
     // audit is best-effort; never block the save on logging failure
   }
@@ -78,4 +83,67 @@ export async function updateNavItems(formData: FormData) {
   await audit(ctx.userId, "nav.update");
   revalidatePath("/", "layout");
   revalidatePath("/admin/settings");
+}
+
+/** Add one value to `gender` or `shirt_size`.
+ *
+ *  The list key is validated against the same two keys the table's check
+ *  constraint allows, so a tampered form field is refused here rather than
+ *  relying on the database to reject it. The value is trimmed and length-capped
+ *  because it renders in a public dropdown.
+ *
+ *  New options go to the end: sort_order is one past the current highest, so
+ *  adding a size never reorders the ones already there. */
+export async function addRegistrationOption(formData: FormData): Promise<{ error?: string }> {
+  const ctx = await requirePYH();
+  const parsed = registrationOptionSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid option" };
+  const { list_key, value } = parsed.data;
+
+  const supabase = await createServerSupabase();
+  const { data: last } = await supabase
+    .from("option_lists")
+    .select("sort_order")
+    .eq("list_key", list_key)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((last as { sort_order: number } | null)?.sort_order ?? 0) + 1;
+
+  const { data, error } = await supabase
+    .from("option_lists")
+    .insert({ list_key, value, sort_order: nextOrder })
+    .select("id")
+    .single();
+  // The unique (list_key, value) constraint is the one an admin will actually
+  // hit, by adding a size that is already there. Say so plainly instead of
+  // surfacing a Postgres error string.
+  if (error) {
+    return { error: error.code === "23505" ? `"${value}" is already in that list.` : error.message };
+  }
+
+  await audit(ctx.userId, "option.create", "option_lists", (data as { id: string }).id);
+  revalidatePath("/admin/settings");
+  revalidatePath("/events");
+  revalidatePath("/");
+  return {};
+}
+
+/** Remove one value from a list.
+ *
+ *  Nothing references option_lists, so this cannot orphan a row: a registration
+ *  keeps the text it was submitted with, which is the historically correct
+ *  answer. Deleting the last option in a list is allowed — the loader falls
+ *  back to the built-in values rather than serving an empty dropdown. */
+export async function deleteRegistrationOption(id: string): Promise<{ error?: string }> {
+  const ctx = await requirePYH();
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.from("option_lists").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  await audit(ctx.userId, "option.delete", "option_lists", id);
+  revalidatePath("/admin/settings");
+  revalidatePath("/events");
+  revalidatePath("/");
+  return {};
 }

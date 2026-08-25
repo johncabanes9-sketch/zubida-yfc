@@ -27,7 +27,7 @@ const tryRead = (p) => { try { return read(p); } catch { return ""; } };
 const trySql = (p) => tryRead(p).replace(/^\s*--.*$/gm, "");
 const tryImport = async (p) => { try { return await import(p); } catch { return null; } };
 
-const { SITE } = await import("../src/lib/constants.ts");
+const { SITE, REGISTRATION_OPTIONS } = await import("../src/lib/constants.ts");
 const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
 const { isVerified } = await import("../src/lib/content/fixtures.ts");
 
@@ -563,6 +563,88 @@ check(
   "the TikTok URL ships blank rather than guessed",
   SITE.socials.tiktok === "",
   SITE.socials.tiktok,
+);
+
+// -- 4d. Gender and shirt size are lists, not code ---------------------------
+// Both shipped as arrays literal in registration-form.tsx, so adding a size or
+// changing how gender is worded was a deploy. They are the only two dropdowns
+// in the app that are pure value lists: registrations store them as plain text
+// (0002: `gender text`, `shirt_size text`), nothing branches on the values, and
+// no foreign key points at them. That is what makes them safe to hand over —
+// unlike event status and scope, which the code reads.
+const m30 = trySql("supabase/migrations/0030_option_lists.sql");
+check(
+  "migration 0030 creates the option_lists table",
+  /create table if not exists option_lists/i.test(m30),
+  null,
+);
+check(
+  "an option cannot be added to the same list twice",
+  /unique\s*\(\s*list_key\s*,\s*value\s*\)/i.test(m30),
+  null,
+);
+// Public read: the registration form is served to anonymous visitors.
+// PYH-only write: a cluster head editing the province's shirt sizes is the
+// same privilege break the RBAC work closed everywhere else.
+check(
+  "option_lists is readable by anonymous visitors",
+  /create policy option_lists_public_read[\s\S]*for select to anon, authenticated/i.test(m30),
+  null,
+);
+check(
+  "only the PYH may write option_lists",
+  /create policy option_lists_pyh_write[\s\S]*is_pyh\(auth\.uid\(\)\)/i.test(m30),
+  null,
+);
+// Same rule as the site_settings seed: the seed and the constants that back
+// the DB-outage fallback must not drift, or the form offers one set of sizes
+// when the database is up and another when it is down.
+for (const [key, values] of Object.entries(REGISTRATION_OPTIONS)) {
+  check(
+    `migration 0030 seeds every ${key} option from REGISTRATION_OPTIONS`,
+    values.every((v) => m30.includes(`'${v}'`)),
+    values.filter((v) => !m30.includes(`'${v}'`)),
+  );
+}
+
+// tryRead, not code: this file does not exist until the loader is written, and
+// a missing file must fail its own assertion rather than crash the suite.
+const optionsLoader = stripComments(tryRead("src/lib/data/options.ts"));
+check(
+  "an empty list falls back to the built-in options rather than an empty dropdown",
+  /length\s*>\s*0/.test(optionsLoader) && /REGISTRATION_OPTIONS/.test(optionsLoader),
+  null,
+);
+
+// The form must render what it is given. A literal array left behind would go
+// on being the real source while the admin edits a list that changes nothing.
+check(
+  "the registration form no longer hardcodes the shirt sizes",
+  !/const shirtSizes\s*=\s*\[/.test(regFormSource),
+  null,
+);
+check(
+  "the registration form no longer hardcodes the gender options",
+  !/<option>Prefer not to say<\/option>/.test(regFormSource),
+  null,
+);
+
+const optionActions = code("src/app/admin/settings/actions.ts");
+check(
+  "adding an option requires the PYH",
+  /export async function addRegistrationOption[\s\S]{0,200}requirePYH\(\)/.test(optionActions),
+  null,
+);
+check(
+  "deleting an option requires the PYH",
+  /export async function deleteRegistrationOption[\s\S]{0,200}requirePYH\(\)/.test(optionActions),
+  null,
+);
+check(
+  "both option writes are audited",
+  /audit\(ctx\.userId,\s*"option\.create"/.test(optionActions) &&
+    /audit\(ctx\.userId,\s*"option\.delete"/.test(optionActions),
+  null,
 );
 
 

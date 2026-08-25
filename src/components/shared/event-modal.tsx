@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import type { RegistrationOptionLists } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RegistrationForm } from "./registration-form";
@@ -21,10 +22,13 @@ import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export function EventModal({
   event,
+  options,
   open,
   onClose,
 }: {
   event: EventItem;
+  /** Passed through to the registration form; see its default. */
+  options?: RegistrationOptionLists;
   open: boolean;
   onClose: () => void;
 }) {
@@ -148,7 +152,7 @@ export function EventModal({
                 </div>
               </div>
             ) : (
-              <RegistrationForm event={event} />
+              <RegistrationForm event={event} options={options} />
             )}
           </motion.div>
         </motion.div>

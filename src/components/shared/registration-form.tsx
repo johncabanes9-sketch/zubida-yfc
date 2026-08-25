@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import {
+  DEFAULT_REGISTRATION_OPTIONS as FALLBACK_OPTIONS,
+  type RegistrationOptionLists,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, Input, Select } from "@/components/ui/field";
 import { Turnstile } from "./turnstile";
@@ -16,7 +20,6 @@ const chapters = [
   "Margosatubig", "Tambulig", "Mahayag", "Dumingag", "San Miguel",
   "Tabina", "Ramon Magsaysay",
 ];
-const shirtSizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 
 type Success = { registrationId: string; qr: string };
 
@@ -53,7 +56,18 @@ function completion(form: HTMLFormElement): { done: number; total: number } {
   return { done, total: required.length };
 }
 
-export function RegistrationForm({ event }: { event: EventItem }) {
+/** `options` is threaded down from the server component that renders the event,
+ *  so the dropdowns are correct in the first paint rather than after a fetch.
+ *  It defaults to the built-in lists: the form is used in places (and tests)
+ *  that have no database behind them, and a missing prop must not empty a
+ *  dropdown. The PYH edits the live values in /admin/settings. */
+export function RegistrationForm({
+  event,
+  options = FALLBACK_OPTIONS,
+}: {
+  event: EventItem;
+  options?: RegistrationOptionLists;
+}) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Success | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -218,15 +232,13 @@ export function RegistrationForm({ event }: { event: EventItem }) {
           <Field label="Gender">
             <Select name="gender" defaultValue="">
               <option value="" disabled>Select…</option>
-              <option>Male</option>
-              <option>Female</option>
-              <option>Prefer not to say</option>
+              {options.gender.map((g) => <option key={g}>{g}</option>)}
             </Select>
           </Field>
           <Field label="T-shirt size">
             <Select name="shirt" defaultValue="">
               <option value="" disabled>Select…</option>
-              {shirtSizes.map((s) => <option key={s}>{s}</option>)}
+              {options.shirt_size.map((s) => <option key={s}>{s}</option>)}
             </Select>
           </Field>
         </div>
