@@ -517,6 +517,54 @@ check(
   INVENTED_CLUSTERS.filter((c) => regFormSource.includes(c)),
 );
 
+// -- 4c. TikTok is plumbed end to end before there is a URL to put in it -----
+// The organization has a TikTok presence to add later. "Later" is only a paste
+// if every layer already carries the field: a column to store it, a schema that
+// validates it, an action that persists it, a form that offers it, a fallback
+// that survives a DB outage, and a footer that renders it. Missing any one of
+// them turns a settings edit back into a deploy. The stored value is blank on
+// purpose until the real URL is confirmed — an unverified link is the mistake
+// 0027 just finished undoing.
+const m29 = trySql("supabase/migrations/0029_tiktok_url.sql");
+check(
+  "migration 0029 adds a column to store a TikTok URL",
+  /alter table site_settings[\s\S]*add column if not exists tiktok_url/i.test(m29),
+  null,
+);
+check(
+  "the settings schema validates the TikTok URL like the other socials",
+  /tiktok_url:\s*optionalUrl/.test(code("src/lib/validation/site.ts")),
+  null,
+);
+check(
+  "the settings action persists the TikTok URL",
+  /tiktok_url:\s*input\.tiktok_url\s*\|\|\s*null/.test(code("src/app/admin/settings/actions.ts")),
+  null,
+);
+check("the settings form offers a TikTok field", found("tiktok_url"), null);
+check(
+  "the row type carries tiktok_url",
+  /tiktok_url:\s*string\s*\|\s*null/.test(code("src/lib/supabase/database.types.ts")),
+  null,
+);
+check(
+  "the DB-outage fallback carries a TikTok slot",
+  /tiktok/.test(code("src/lib/data/site.ts")),
+  null,
+);
+// Blank must hide the icon, exactly as a withheld email hides its row. An
+// icon linking nowhere is worse than no icon.
+check(
+  "the footer omits the TikTok icon until a URL is set",
+  /\{\s*tiktok\s*&&/.test(footer),
+  null,
+);
+check(
+  "the TikTok URL ships blank rather than guessed",
+  SITE.socials.tiktok === "",
+  SITE.socials.tiktok,
+);
+
 
 // -- 5. Every field the registration payload reads is actually submitted ------
 // A control with no `name` is omitted from FormData entirely, so `fd.get(...)`

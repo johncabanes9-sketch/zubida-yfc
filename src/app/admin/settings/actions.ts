@@ -36,6 +36,7 @@ export async function updateSiteSettings(formData: FormData) {
       office: input.office,
       facebook_url: input.facebook_url || null,
       instagram_url: input.instagram_url || null,
+      tiktok_url: input.tiktok_url || null,
       footer_explore_heading: input.footer_explore_heading,
       footer_reach_heading: input.footer_reach_heading,
       footer_closing_line: input.footer_closing_line,

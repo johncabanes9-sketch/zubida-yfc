@@ -14,7 +14,7 @@ export type SiteSettings = {
   email: string;
   phone: string;
   office: string;
-  socials: { facebook: string; instagram: string };
+  socials: { facebook: string; instagram: string; tiktok: string };
   footerExploreHeading: string;
   footerReachHeading: string;
   footerClosingLine: string;
@@ -36,7 +36,11 @@ const FALLBACK: SiteData = {
     email: SITE.email,
     phone: SITE.phone,
     office: SITE.office,
-    socials: { facebook: SITE.socials.facebook, instagram: SITE.socials.instagram },
+    socials: {
+      facebook: SITE.socials.facebook,
+      instagram: SITE.socials.instagram,
+      tiktok: SITE.socials.tiktok,
+    },
     footerExploreHeading: "Explore",
     footerReachHeading: "Reach Us",
     footerClosingLine: `Built for the youth of ${SITE.province}. Ad Majorem Dei Gloriam.`,
@@ -72,7 +76,12 @@ export async function getSiteSettings(): Promise<SiteData> {
           email: row.email,
           phone: row.phone,
           office: row.office,
-          socials: { facebook: row.facebook_url ?? "", instagram: row.instagram_url ?? "" },
+          socials: {
+            facebook: row.facebook_url ?? "",
+            instagram: row.instagram_url ?? "",
+            // Null on rows predating 0029 — same as blank: the icon hides.
+            tiktok: row.tiktok_url ?? "",
+          },
           footerExploreHeading: row.footer_explore_heading,
           footerReachHeading: row.footer_reach_heading,
           footerClosingLine: row.footer_closing_line,

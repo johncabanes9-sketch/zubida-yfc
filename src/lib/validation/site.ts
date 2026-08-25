@@ -34,6 +34,7 @@ export const siteSettingsSchema = z.object({
   office: z.string().min(1).max(300),
   facebook_url: optionalUrl,
   instagram_url: optionalUrl,
+  tiktok_url: optionalUrl,
   footer_explore_heading: z.string().min(1).max(60),
   footer_reach_heading: z.string().min(1).max(60),
   footer_closing_line: z.string().min(1).max(300),

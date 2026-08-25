@@ -21,6 +21,10 @@ export const SITE = {
     // — the footer renders an icon linking to an account nobody has confirmed
     // exists. Withhold it (set blank in /admin/settings) or replace it.
     instagram: "https://instagram.com/zubidayfc",
+    // Blank until the real page is confirmed. Every layer below it is wired
+    // (migration 0029), so publishing it is a paste into /admin/settings, not
+    // a deploy. Blank hides the icon rather than linking nowhere.
+    tiktok: "",
   },
 };
 

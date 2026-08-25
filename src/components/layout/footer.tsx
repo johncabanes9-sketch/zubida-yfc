@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/constants";
 import { publishedContact } from "@/lib/content/contact";
+import { TikTokIcon } from "@/components/shared/tiktok-icon";
 import type { SiteSettings, NavItem } from "@/lib/data/site";
 
 export function Footer({
@@ -25,6 +26,7 @@ export function Footer({
   });
   const facebook = s?.socials.facebook ?? SITE.socials.facebook;
   const instagram = s?.socials.instagram ?? SITE.socials.instagram;
+  const tiktok = s?.socials.tiktok ?? SITE.socials.tiktok;
   const exploreHeading = s?.footerExploreHeading ?? "Explore";
   const reachHeading = s?.footerReachHeading ?? "Reach Us";
   const closingLine =
@@ -68,6 +70,15 @@ export function Footer({
                 className="grid h-10 w-10 place-items-center rounded-full border border-white/15 transition-colors hover:bg-white/10"
               >
                 <Instagram className="h-5 w-5" />
+              </a>
+            )}
+            {tiktok && (
+              <a
+                href={tiktok}
+                aria-label="TikTok"
+                className="grid h-10 w-10 place-items-center rounded-full border border-white/15 transition-colors hover:bg-white/10"
+              >
+                <TikTokIcon className="h-5 w-5" />
               </a>
             )}
           </div>
