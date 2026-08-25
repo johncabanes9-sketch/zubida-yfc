@@ -264,10 +264,20 @@ export function RegistrationForm({
             )}
           </Field>
           <Field label="Cluster">
-            {/* Free text, not a Select, because a registrant may belong to a
-                cluster this deployment has not recorded yet. The example is
-                one of the organization's real three (migration 0028). */}
-            <Input name="cluster" placeholder="e.g. Central Cluster" />
+            {/* The cluster set is closed — there are three, named by 0028 — so
+                this is a dropdown rather than the free text box it was. A text
+                box invited a registrant to invent a fourth cluster or spell one
+                of the three differently, leaving an admin to reconcile it by
+                hand. Optional, so a blank first option stays selectable.
+                Falls back to free text only if the table cannot be read. */}
+            {options.clusters.length > 0 ? (
+              <Select name="cluster" defaultValue="">
+                <option value="">Select cluster…</option>
+                {options.clusters.map((c) => <option key={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input name="cluster" placeholder="Your cluster" />
+            )}
           </Field>
           <Field label="Parish">
             <Input name="parish" />

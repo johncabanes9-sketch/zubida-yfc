@@ -663,6 +663,20 @@ check(
   null,
 );
 
+// The cluster set is closed — there are three, and 0028 names them. A free
+// text box invited a registrant to invent a fourth, or to spell one of the
+// three differently, leaving an admin to reconcile it by hand afterwards.
+check(
+  "cluster options come from the clusters table",
+  /from\("clusters"\)/.test(optionsLoader),
+  null,
+);
+check(
+  "the registration form offers the clusters as a dropdown",
+  /clusters\.length\s*>\s*0/.test(regFormSource),
+  null,
+);
+
 // -- 4f. An event with no cover renders no broken image ---------------------
 // events.cover is nullable (0001) but EventItem declared `cover: string`, and
 // the loader laundered the null into "" to satisfy it. Nobody guarded the

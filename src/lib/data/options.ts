@@ -19,14 +19,18 @@ const FALLBACK: RegistrationOptionLists = DEFAULT_REGISTRATION_OPTIONS;
 
 export async function getRegistrationOptions(): Promise<RegistrationOptionLists> {
   try {
-    const [{ data }, chapters] = await Promise.all([
-      createServiceClient()
+    const db = createServiceClient();
+    const [{ data }, chapters, { data: clusterRows }] = await Promise.all([
+      db
         .from("option_lists")
         .select("list_key, value, sort_order")
         .order("sort_order", { ascending: true }),
       // Published, undeleted, in display order — and no fixture fallback, so
       // an outage yields [] rather than invented chapter names.
       getChapters(),
+      // Every cluster is real — the table carries no publication flag and no
+      // soft delete, so there is nothing to filter out.
+      db.from("clusters").select("name").order("name", { ascending: true }),
     ]);
 
     const rows = (data as Pick<OptionListRow, "list_key" | "value" | "sort_order">[] | null) ?? [];
@@ -42,6 +46,7 @@ export async function getRegistrationOptions(): Promise<RegistrationOptionLists>
       gender: gender.length > 0 ? gender : FALLBACK.gender,
       shirt_size: shirtSize.length > 0 ? shirtSize : FALLBACK.shirt_size,
       chapters: chapters.map((c) => c.name),
+      clusters: ((clusterRows as { name: string }[] | null) ?? []).map((c) => c.name),
     };
   } catch {
     return FALLBACK;

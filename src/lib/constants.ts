@@ -50,6 +50,7 @@ export type OptionListKey = keyof typeof REGISTRATION_OPTIONS;
  *  free-text field, not to names nobody has confirmed. */
 export type RegistrationOptionLists = Record<OptionListKey, string[]> & {
   chapters: string[];
+  clusters: string[];
 };
 
 /** Mutable copy of the built-ins, shared by the server loader's fallback and
@@ -58,8 +59,10 @@ export type RegistrationOptionLists = Record<OptionListKey, string[]> & {
 export const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptionLists = {
   gender: [...REGISTRATION_OPTIONS.gender],
   shirt_size: [...REGISTRATION_OPTIONS.shirt_size],
-  // Deliberately empty: there is no such thing as a built-in chapter.
+  // Both deliberately empty: there is no such thing as a built-in chapter or
+  // a built-in cluster. An outage must not offer names nobody has confirmed.
   chapters: [],
+  clusters: [],
 };
 
 export const NAV_LINKS = [
