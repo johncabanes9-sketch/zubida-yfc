@@ -1,8 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/constants";
 import { publishedContact } from "@/lib/content/contact";
-import { Sunburst } from "@/components/shared/sunburst";
 import type { SiteSettings, NavItem } from "@/lib/data/site";
 
 export function Footer({
@@ -35,12 +35,16 @@ export function Footer({
       <div className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-radiant blur-2xl" />
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-dawn-soft text-gold-300">
-              <Sunburst className="h-6 w-6" rays={12} />
-            </span>
-            <span className="font-display text-xl font-semibold">{name}</span>
-          </div>
+          {/* Wider than the navbar's copy on purpose: this is the one place on
+              the page with room to render the lockup large enough that its own
+              "ZAMBOANGA DEL SUR" line is actually legible. */}
+          <Image
+            src="/logo.png"
+            alt={`${name} — CFC-YFC ${s?.province ?? SITE.province}`}
+            width={1200}
+            height={833}
+            className="h-auto w-52 sm:w-60"
+          />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-cream/70">
             {description}
           </p>
