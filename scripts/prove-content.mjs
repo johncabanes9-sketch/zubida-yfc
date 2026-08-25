@@ -629,6 +629,40 @@ check(
   null,
 );
 
+// -- 4e. The chapter dropdown reads the chapters the admin actually manages --
+// registration-form.tsx carried its own copy of the twelve chapters
+// ZUBIDA_CONTENT_AUDIT.md §5 recorded as FABRICATED. Removing them from
+// src/data/chapters.ts did not remove them from the public registration form,
+// where they went on being the list a member picked from — while /admin/chapters
+// managed a different set entirely.
+check(
+  "the registration form no longer hardcodes the fabricated chapters",
+  !/const chapters\s*=\s*\[/.test(regFormSource) && !/"Molave"/.test(regFormSource),
+  null,
+);
+check(
+  "chapter options come from published, undeleted chapters",
+  /getChapters\(\)/.test(optionsLoader),
+  null,
+);
+// getChapters() refuses a fixture fallback on purpose: an outage must not
+// resurrect invented chapters. The same rule has to hold here, so the loader
+// and the constants must carry no chapter names at all.
+check(
+  "an outage does not resurrect the fabricated chapters",
+  !/Molave|Labangan|Tukuran/.test(optionsLoader) &&
+    !/Molave|Labangan|Tukuran/.test(code("src/lib/constants.ts")),
+  null,
+);
+// Consequence of refusing that fallback: with nothing published there is
+// nothing to put in the dropdown, and chapter is a required field. The form
+// has to degrade to free text or registration stops working entirely.
+check(
+  "the chapter field stays answerable when no chapter is published",
+  /chapters\.length\s*>\s*0/.test(regFormSource),
+  null,
+);
+
 const optionActions = code("src/app/admin/settings/actions.ts");
 check(
   "adding an option requires the PYH",

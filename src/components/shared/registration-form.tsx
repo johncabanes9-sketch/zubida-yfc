@@ -15,12 +15,6 @@ import { Turnstile } from "./turnstile";
 /** Inlined at build time. Unset locally, which puts the server in degraded mode too. */
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-const chapters = [
-  "Pagadian City", "Molave", "Labangan", "Aurora", "Tukuran",
-  "Margosatubig", "Tambulig", "Mahayag", "Dumingag", "San Miguel",
-  "Tabina", "Ramon Magsaysay",
-];
-
 type Success = { registrationId: string; qr: string };
 
 async function postWithRetry(payload: Record<string, unknown>, tries = 3): Promise<Response> {
@@ -58,9 +52,11 @@ function completion(form: HTMLFormElement): { done: number; total: number } {
 
 /** `options` is threaded down from the server component that renders the event,
  *  so the dropdowns are correct in the first paint rather than after a fetch.
- *  It defaults to the built-in lists: the form is used in places (and tests)
- *  that have no database behind them, and a missing prop must not empty a
- *  dropdown. The PYH edits the live values in /admin/settings. */
+ *
+ *  The default covers the places (and tests) that render this form with no
+ *  database behind them. It carries the built-in gender and shirt sizes, which
+ *  the PYH edits in /admin/settings — but no chapters, because there is no such
+ *  thing as a built-in chapter. That field degrades to free text instead. */
 export function RegistrationForm({
   event,
   options = FALLBACK_OPTIONS,
@@ -253,10 +249,19 @@ export function RegistrationForm({
             <Input type="tel" name="phone" required autoComplete="tel" />
           </Field>
           <Field label="Chapter" required>
-            <Select name="chapter" required defaultValue="">
-              <option value="" disabled>Select chapter…</option>
-              {chapters.map((c) => <option key={c}>{c}</option>)}
-            </Select>
+            {/* The list is the published chapters and nothing else — there is
+                no built-in fallback, because a fabricated chapter name is what
+                this form used to offer. With nothing published there is nothing
+                to choose from, and chapter is required, so the field degrades
+                to free text rather than to a dropdown that cannot be answered. */}
+            {options.chapters.length > 0 ? (
+              <Select name="chapter" required defaultValue="">
+                <option value="" disabled>Select chapter…</option>
+                {options.chapters.map((c) => <option key={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input name="chapter" required placeholder="Your chapter" />
+            )}
           </Field>
           <Field label="Cluster">
             {/* Free text, not a Select, because a registrant may belong to a

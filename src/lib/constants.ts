@@ -39,7 +39,18 @@ export const REGISTRATION_OPTIONS = {
 } as const;
 
 export type OptionListKey = keyof typeof REGISTRATION_OPTIONS;
-export type RegistrationOptionLists = Record<OptionListKey, string[]>;
+
+/** What the registration form's three dropdowns offer.
+ *
+ *  `gender` and `shirt_size` come from `option_lists` and fall back to the
+ *  built-ins above. `chapters` does NOT fall back: it is the published chapters
+ *  and nothing else. getChapters() refuses a fixture fallback so an outage
+ *  cannot resurrect the twelve invented chapters (ZUBIDA_CONTENT_AUDIT.md §5),
+ *  and the same rule holds here — an empty list makes the form fall back to a
+ *  free-text field, not to names nobody has confirmed. */
+export type RegistrationOptionLists = Record<OptionListKey, string[]> & {
+  chapters: string[];
+};
 
 /** Mutable copy of the built-ins, shared by the server loader's fallback and
  *  the form's default prop so there is exactly one definition of "the built-in
@@ -47,6 +58,8 @@ export type RegistrationOptionLists = Record<OptionListKey, string[]>;
 export const DEFAULT_REGISTRATION_OPTIONS: RegistrationOptionLists = {
   gender: [...REGISTRATION_OPTIONS.gender],
   shirt_size: [...REGISTRATION_OPTIONS.shirt_size],
+  // Deliberately empty: there is no such thing as a built-in chapter.
+  chapters: [],
 };
 
 export const NAV_LINKS = [

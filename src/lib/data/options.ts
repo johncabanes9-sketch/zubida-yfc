@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getChapters } from "@/lib/data/chapters";
 import {
   DEFAULT_REGISTRATION_OPTIONS,
   type OptionListKey,
@@ -18,10 +19,15 @@ const FALLBACK: RegistrationOptionLists = DEFAULT_REGISTRATION_OPTIONS;
 
 export async function getRegistrationOptions(): Promise<RegistrationOptionLists> {
   try {
-    const { data } = await createServiceClient()
-      .from("option_lists")
-      .select("list_key, value, sort_order")
-      .order("sort_order", { ascending: true });
+    const [{ data }, chapters] = await Promise.all([
+      createServiceClient()
+        .from("option_lists")
+        .select("list_key, value, sort_order")
+        .order("sort_order", { ascending: true }),
+      // Published, undeleted, in display order — and no fixture fallback, so
+      // an outage yields [] rather than invented chapter names.
+      getChapters(),
+    ]);
 
     const rows = (data as Pick<OptionListRow, "list_key" | "value" | "sort_order">[] | null) ?? [];
     const pick = (key: OptionListKey) =>
@@ -35,6 +41,7 @@ export async function getRegistrationOptions(): Promise<RegistrationOptionLists>
     return {
       gender: gender.length > 0 ? gender : FALLBACK.gender,
       shirt_size: shirtSize.length > 0 ? shirtSize : FALLBACK.shirt_size,
+      chapters: chapters.map((c) => c.name),
     };
   } catch {
     return FALLBACK;
