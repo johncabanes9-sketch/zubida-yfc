@@ -167,6 +167,40 @@ try {
 
     await ctx.close();
   }
+
+  // The admins here are youth volunteers, not people who keep a bookmark for a
+  // URL nobody links. /admin/login has always been reachable by typing it and
+  // by nothing else, so losing the URL meant losing the way in. The link sits
+  // in the footer and not the primary nav on purpose: it serves the handful of
+  // leaders who need it without putting a login form in front of every visitor.
+  // Its size is already governed by the target-size assertion above, which
+  // audits "/" and therefore audits the footer.
+  {
+    const ctx = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+    });
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(60_000);
+    await page.goto(BASE_URL + "/", { waitUntil: "networkidle", timeout: 90_000 });
+
+    const entry = await page.evaluate(() => {
+      const el = document.querySelector('footer a[href="/admin/login"]');
+      return {
+        found: el !== null,
+        name: el ? (el.textContent || el.getAttribute("aria-label") || "").trim() : null,
+        inNav: document.querySelector('header a[href="/admin/login"]') !== null,
+      };
+    });
+
+    check("the footer offers a way in to admin sign-in", entry.found, entry);
+    check("that way in carries an accessible name", Boolean(entry.name), entry);
+    // A nav_links row would put it here as well as in the footer's Explore
+    // column — the wrong mechanism for a link meant to stay discreet.
+    check("the primary nav does not advertise admin sign-in", !entry.inNav, entry);
+
+    await ctx.close();
+  }
 } finally {
   await browser?.close();
   stop?.();
