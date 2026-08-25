@@ -247,7 +247,10 @@ export function RegistrationForm({ event }: { event: EventItem }) {
             </Select>
           </Field>
           <Field label="Cluster">
-            <Input name="cluster" placeholder="e.g. Bay Cluster" />
+            {/* Free text, not a Select, because a registrant may belong to a
+                cluster this deployment has not recorded yet. The example is
+                one of the organization's real three (migration 0028). */}
+            <Input name="cluster" placeholder="e.g. Central Cluster" />
           </Field>
           <Field label="Parish">
             <Input name="parish" />

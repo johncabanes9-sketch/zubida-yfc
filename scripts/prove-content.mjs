@@ -40,6 +40,15 @@ const PLACEHOLDER_EMAIL = "hello@zubidayfc.org";
 const PLACEHOLDER_FACEBOOK = "https://facebook.com/zubidayfc";
 const VERIFIED_FACEBOOK = "https://www.facebook.com/yfczds";
 
+// 0007 seeded three cluster names taken from the Phase-1 chapter fixtures.
+// They were never the organization's clusters, which are Central, East and
+// West. Every chapter, leader and event carries a cluster_id, so the invented
+// names were not confined to a fixture file — they were the labels on real
+// admin dropdowns. 0028 renames the rows; the ids, and therefore every
+// reference to them, survive untouched.
+const INVENTED_CLUSTERS = ["Bay Cluster", "North Cluster", "South Cluster"];
+const CONFIRMED_CLUSTERS = ["Central Cluster", "East Cluster", "West Cluster"];
+
 let pass = 0, fail = 0;
 const check = (n, c, got) =>
   c ? (pass++, console.log(`  PASS  ${n}`)) : (fail++, console.log(`  FAIL  ${n}  got=${JSON.stringify(got)}`));
@@ -475,6 +484,37 @@ check(
   "migration 0027 only corrects rows still carrying the invented handle",
   /where[\s\S]*facebook_url\s*=\s*'https:\/\/facebook\.com\/zubidayfc'/i.test(m27),
   PLACEHOLDER_FACEBOOK,
+);
+
+// The cluster names were the last invented identity still being shown to
+// administrators — every chapter, leader and event form listed them.
+const m28 = trySql("supabase/migrations/0028_confirmed_cluster_names.sql");
+for (const name of CONFIRMED_CLUSTERS) {
+  check(`migration 0028 stores the confirmed cluster "${name}"`, m28.includes(`'${name}'`), null);
+}
+for (const name of INVENTED_CLUSTERS) {
+  check(
+    `migration 0028 is guarded on the invented cluster "${name}"`,
+    new RegExp(`where[\\s\\S]*name\\s*=\\s*'${name}'`, "i").test(m28),
+    null,
+  );
+}
+// Renaming without moving the slug leaves /clusters?c=bay style values and the
+// row's own name disagreeing — the drift this suite exists to prevent.
+check(
+  "migration 0028 moves each slug with its name",
+  ["central", "east", "west"].every((s) => new RegExp(`slug\\s*=\\s*'${s}'`).test(m28)),
+  null,
+);
+
+// A placeholder is content too: "e.g. Bay Cluster" tells a registrant the
+// organization has a Bay Cluster, in the one field where they are being asked
+// to name their own.
+const regFormSource = code("src/components/shared/registration-form.tsx");
+check(
+  "the registration form suggests no invented cluster",
+  !INVENTED_CLUSTERS.some((c) => regFormSource.includes(c)),
+  INVENTED_CLUSTERS.filter((c) => regFormSource.includes(c)),
 );
 
 
