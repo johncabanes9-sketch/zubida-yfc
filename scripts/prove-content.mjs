@@ -35,6 +35,10 @@ const { isVerified } = await import("../src/lib/content/fixtures.ts");
 // 0013 seed and in 0022's guard, so the suite needs the literals to check both.
 const PLACEHOLDER_PHONE = "+63 962 000 0000";
 const PLACEHOLDER_EMAIL = "hello@zubidayfc.org";
+// The Facebook page 0013 invented, and the one the organization confirmed.
+// Both literals are needed: 0027 is guarded on the first and sets the second.
+const PLACEHOLDER_FACEBOOK = "https://facebook.com/zubidayfc";
+const VERIFIED_FACEBOOK = "https://www.facebook.com/yfczds";
 
 let pass = 0, fail = 0;
 const check = (n, c, got) =>
@@ -57,7 +61,6 @@ for (const [field, value] of Object.entries({
   description: SITE.description,
   province: SITE.province,
   office: SITE.office,
-  facebook: SITE.socials.facebook,
   instagram: SITE.socials.instagram,
 })) {
   check(`site_settings seed matches SITE.${field}`, seedHas(value), value);
@@ -66,6 +69,18 @@ for (const [field, value] of Object.entries({
 // email and phone are deliberately absent from that loop. They are withheld
 // rather than matched, and 0013 still carries the stand-ins it seeded — §9
 // asserts that both sides are now blank instead.
+
+// facebook is absent for the same shape of reason, with the opposite outcome.
+// 0013 seeded an invented handle the audit flagged as never validated (§7.1);
+// the organization has since confirmed the real page, so 0027 corrects the
+// stored value rather than blanking it. 0013 still carries the stand-in, so
+// matching the seed against SITE would fail by design — §9 checks the
+// correction instead.
+check(
+  "SITE carries the confirmed Facebook page, not the invented handle",
+  SITE.socials.facebook === VERIFIED_FACEBOOK,
+  SITE.socials.facebook,
+);
 
 // site_url arrived in 0018, not the 0013 seed.
 const m18 = read("supabase/migrations/0018_site_url.sql");
@@ -444,6 +459,22 @@ check(
   /where[\s\S]*phone\s*=\s*'\+63 962 000 0000'/i.test(m22) &&
     /where[\s\S]*email\s*=\s*'hello@zubidayfc\.org'/i.test(m22),
   null,
+);
+
+// The Facebook page is the one unverified claim in §7.1 that got confirmed
+// rather than withheld. 0027 has to move the stored value too — correcting
+// only the constant would leave the live footer pointing at the invented
+// handle for as long as the database is up, which is every normal day.
+const m27 = trySql("supabase/migrations/0027_verified_facebook_url.sql");
+check(
+  "migration 0027 stores the confirmed Facebook page",
+  m27.includes(VERIFIED_FACEBOOK) && /facebook_url\s*=\s*'https:\/\/www\.facebook\.com\/yfczds'/.test(m27),
+  null,
+);
+check(
+  "migration 0027 only corrects rows still carrying the invented handle",
+  /where[\s\S]*facebook_url\s*=\s*'https:\/\/facebook\.com\/zubidayfc'/i.test(m27),
+  PLACEHOLDER_FACEBOOK,
 );
 
 

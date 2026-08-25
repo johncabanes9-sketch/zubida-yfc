@@ -15,7 +15,11 @@ export const SITE = {
   phone: "",
   office: "YFC Provincial Office, Pagadian City, Zamboanga del Sur",
   socials: {
-    facebook: "https://facebook.com/zubidayfc",
+    // Confirmed by the organization; migration 0027 corrects the stored copy.
+    facebook: "https://www.facebook.com/yfczds",
+    // Still the handle 0013 invented. UNVERIFIED (ZUBIDA_CONTENT_AUDIT.md §7.1)
+    // — the footer renders an icon linking to an account nobody has confirmed
+    // exists. Withhold it (set blank in /admin/settings) or replace it.
     instagram: "https://instagram.com/zubidayfc",
   },
 };
