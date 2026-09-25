@@ -238,7 +238,18 @@ async function cleanup(eventId, quiet = false) {
     await form.locator('[name="age"]').fill("19");
     await form.locator('[name="email"]').fill(EMAIL);
     await form.locator('[name="phone"]').fill("09171234567");
-    await form.locator('[name="chapter"]').selectOption("Pagadian City");
+    // Chapter is a <select> of published chapters, or free text when there are
+    // none. Pick whichever real option exists rather than naming one: the old
+    // hardcoded list was invented and is gone.
+    const chapter = form.locator('[name="chapter"]');
+    if ((await chapter.evaluate((el) => el.tagName)) === "SELECT") {
+      const firstReal = await chapter.evaluate(
+        (el) => [...el.options].find((o) => o.value !== "")?.value ?? "",
+      );
+      await chapter.selectOption(firstReal);
+    } else {
+      await chapter.fill("Prove Registration Chapter");
+    }
     await form.locator('[name="emContact"]').fill("Test Guardian");
     await form.locator('[name="emNumber"]').fill("09181234567");
 
