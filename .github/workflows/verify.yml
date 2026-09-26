@@ -38,3 +38,4 @@ jobs:
       # at production.
       - run: npm run prove:content
       - run: npm run prove:metrics
+      - run: npm run prove:export
