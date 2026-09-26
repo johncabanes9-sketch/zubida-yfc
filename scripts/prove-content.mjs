@@ -766,12 +766,20 @@ if (regForm.includes("cf-turnstile-response")) {
 }
 
 // Both halves of the captcha are gated on env vars, and setting only the server
-// half breaks registration outright. The route must detect that, not just fail.
-const registerRoute = code("src/app/api/register/route.ts");
+// half breaks every public form outright. The shared verifier must detect
+// that, not just fail — and every public form must go through it, so the
+// guard cannot live in one route and be missing from the next.
+const turnstileLib = code("src/lib/turnstile.ts");
 check(
-  "the register route detects a half-configured captcha",
-  registerRoute.includes("NEXT_PUBLIC_TURNSTILE_SITE_KEY"),
+  "the shared captcha verifier detects a half-configured captcha",
+  turnstileLib.includes("NEXT_PUBLIC_TURNSTILE_SITE_KEY"),
 );
+for (const route of ["src/app/api/register/route.ts", "src/app/api/contact/route.ts"]) {
+  check(
+    `${route} verifies captchas through the shared verifier`,
+    /from\s+["']@\/lib\/turnstile["']/.test(code(route)),
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -36,6 +36,9 @@ a real database, an authenticated admin surface, and a page CMS.
   without a recorded consent basis. Photo upload and consent withdrawal exist as
   server actions but are not yet wired into the admin form; that is the next
   slice.
+- Messages inbox — what the public contact form sends, readable by the provincial
+  youth head only. Messages are triaged (new / read / archived), never edited or
+  deleted.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -50,7 +53,7 @@ reach a public page until it is marked verified. Chapters no longer sit there �
 they are a managed database domain, and `/chapters` renders the empty-state
 notice until an administrator publishes a real one.
 
-`npm run prove:content` enforces this: 95 assertions covering identity
+`npm run prove:content` enforces this: 142 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Design
@@ -84,7 +87,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 101 assertions — needs no database
+npm run prove:content      # 142 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:rbac         # 24 — role policies
@@ -97,6 +100,7 @@ npm run prove:a11y         # 64 — the public accessibility floor, in a real br
 npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
+npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
 ```
 
 CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics` and `prove:keepalive` on every pull request.
@@ -177,6 +181,6 @@ src/
     data/           database reads with outage fallbacks
     rbac.ts validation/ email/ qr.ts constants.ts utils.ts
   middleware.ts     session refresh, 30-min idle timeout, admin route protection
-supabase/migrations/   27 ordered .sql migrations
+supabase/migrations/   ordered .sql migrations
 scripts/               db:migrate and the prove:* suites
 ```
