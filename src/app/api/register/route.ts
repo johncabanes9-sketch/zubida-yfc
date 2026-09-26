@@ -7,8 +7,9 @@ import {
   type RegistrationErrorCode,
 } from "@/lib/errors";
 import { createServiceClient } from "@/lib/supabase/server";
-import { generateQrDataUrl, statusUrl } from "@/lib/qr";
-import { sendConfirmationEmail } from "@/lib/email/resend";
+import { generateQrDataUrl, statusUrl, pickLinkBase } from "@/lib/qr";
+import { SITE } from "@/lib/constants";
+import { sendConfirmationEmail } from "@/lib/email/send";
 import type { RegisterResult } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
@@ -101,7 +102,22 @@ export async function POST(req: NextRequest) {
     .single();
   const eventName = (ev as { name?: string } | null)?.name ?? "your event";
 
-  const link = statusUrl(req.nextUrl.origin, data.registration_id!, data.qr_token!);
+  // The base must come from configuration, never from the request: this link
+  // carries the qr_token, and it is encoded into the QR pass as well as mailed.
+  const { data: cfg } = await db
+    .from("site_settings")
+    .select("site_url")
+    .eq("id", 1)
+    .maybeSingle();
+  const link = statusUrl(
+    pickLinkBase({
+      requestOrigin: req.nextUrl.origin,
+      configuredUrl: (cfg as { site_url: string | null } | null)?.site_url ?? SITE.url,
+      isProduction: process.env.NODE_ENV === "production",
+    }),
+    data.registration_id!,
+    data.qr_token!,
+  );
   const qr = await generateQrDataUrl(link);
 
   // Off the critical path — runs after the response is sent.

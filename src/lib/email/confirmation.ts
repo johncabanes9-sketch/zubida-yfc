@@ -2,7 +2,7 @@ export function confirmationHtml(p: {
   fullName: string;
   eventName: string;
   registrationId: string;
-  qrDataUrl: string;
+  qrSrc: string;
   statusUrl: string;
 }) {
   return `<!doctype html><html><body style="margin:0;font-family:Segoe UI,Helvetica,Arial,sans-serif;background:#FBF8F1;padding:24px">
@@ -14,12 +14,12 @@ export function confirmationHtml(p: {
       <div style="padding:26px 28px">
         <p style="color:#333;font-size:15px;line-height:1.5">Your slot for <strong>${escapeHtml(p.eventName)}</strong> is reserved and now <strong>pending approval</strong>. Show this QR code at the venue as your event pass.</p>
         <div style="text-align:center;margin:22px 0">
-          <img src="${p.qrDataUrl}" width="200" height="200" alt="Registration QR code" style="border-radius:12px"/>
+          <img src="${p.qrSrc}" width="200" height="200" alt="Registration QR code" style="border-radius:12px"/>
         </div>
         <p style="text-align:center;margin:0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.1em">Registration ID</p>
         <p style="text-align:center;margin:4px 0 20px;color:#1E40AF;font-size:20px;font-weight:700;letter-spacing:.04em">${escapeHtml(p.registrationId)}</p>
         <div style="text-align:center">
-          <a href="${p.statusUrl}" style="display:inline-block;background:#F5B942;color:#12224E;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">Check your status</a>
+          <a href="${escapeHtml(p.statusUrl)}" style="display:inline-block;background:#F5B942;color:#12224E;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">Check your status</a>
         </div>
       </div>
       <div style="padding:18px 28px;border-top:1px solid #f0f0f0;color:#aaa;font-size:12px;text-align:center">

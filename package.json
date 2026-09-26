@@ -19,6 +19,7 @@
     "prove:editor": "node scripts/prove-editor.mjs",
     "prove:a11y": "node scripts/prove-a11y.mjs",
     "prove:registration": "node scripts/prove-registration.mjs",
+    "prove:email": "node --conditions=react-server --experimental-strip-types --import ./scripts/loaders/register-ts.mjs scripts/prove-email.mjs",
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
     "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs"
   },
@@ -29,6 +30,7 @@
     "framer-motion": "^11.18.0",
     "lucide-react": "^0.469.0",
     "next": "15.1.12",
+    "nodemailer": "^9.0.5",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -39,6 +41,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^8.0.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",

@@ -50,7 +50,7 @@ reach a public page until it is marked verified. Chapters no longer sit there �
 they are a managed database domain, and `/chapters` renders the empty-state
 notice until an administrator publishes a real one.
 
-`npm run prove:content` enforces this: 95 assertions covering identity
+`npm run prove:content` enforces this: 140 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Design
@@ -84,21 +84,22 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 101 assertions — needs no database
+npm run prove:content      # 140 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
+npm run prove:email        # 54 — confirmation-email transports; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
 npm run prove:behaviors    # 12 — registration/slot behaviour
 npm run prove:concurrency  #      slot race conditions
 npm run prove:editor       # 41 — the /admin/pages editing loop, in a real browser
-npm run prove:a11y         # 64 — the public accessibility floor, in a real browser
+npm run prove:a11y         # 67 — the public accessibility floor, in a real browser
 npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 ```
 
-CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.
+CI runs `tsc --noEmit`, `next lint`, `prove:content` and `prove:metrics` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
@@ -119,6 +120,30 @@ is unset locally. Set that variable only together with
 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — the secret alone rejects every registration,
 since no widget renders and no token is ever submitted. The route logs loudly if
 you do it anyway.
+
+## Confirmation email
+
+Registration confirmations pick the first configured transport, in this order:
+
+| Transport | Enabled by | Notes |
+|---|---|---|
+| Resend | `RESEND_API_KEY` | Needs a verified domain to send as `no-reply@zubidayfc.org`. Free tier: 3,000/month, 100/day. |
+| Gmail SMTP | `GMAIL_USER` + `GMAIL_APP_PASSWORD` | Fallback. ~500 recipients/day; Gmail rewrites `From` to the authenticated account. |
+| _none_ | — | Degraded mode: the attempt is written to `email_log` as `queued` and nothing is sent. |
+
+`sendConfirmationEmail` never throws — a dead mailbox must not fail a
+registration. Every outcome lands in `email_log` as `sent`, `queued` or
+`failed`.
+
+The Gmail app password requires 2-Step Verification on the account
+(myaccount.google.com → Security → App passwords). Put it in `.env.local`
+locally and in the Vercel project settings for production; never in a committed
+file.
+
+The QR travels as an **inline `cid:` attachment**, not a `data:` URL. Gmail and
+most webmail clients drop `data:` image sources, which would leave the
+registrant holding a broken image instead of a venue pass. `prove:email` locks
+that down — it is the regression the suite exists for.
 
 `prove:editor`, `prove:a11y` and `prove:registration` are the suites that drive a browser.
 `prove:a11y` needs no database — it audits the public pages at a 390px viewport
