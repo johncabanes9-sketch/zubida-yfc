@@ -36,6 +36,9 @@ a real database, an authenticated admin surface, and a page CMS.
   without a recorded consent basis. Photo upload and consent withdrawal exist as
   server actions but are not yet wired into the admin form; that is the next
   slice.
+- Venue check-in — per event, scan each QR pass with the phone camera (or a
+  handheld scanner, or type the code). A pass is admitted once, only at its own
+  event; live attendance count and undo. Scoped like the event itself.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -96,6 +99,7 @@ npm run prove:a11y         # 64 — the public accessibility floor, in a real br
 npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
+npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
 CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.

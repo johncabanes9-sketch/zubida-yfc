@@ -40,6 +40,9 @@ export interface RegistrationRow {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  checked_in_at: string | null;
+  checked_in_by: string | null;
+  check_in_method: "qr" | "manual" | null;
 }
 
 export interface ClusterRow {
