@@ -39,6 +39,9 @@ a real database, an authenticated admin surface, and a page CMS.
 - Messages inbox — what the public contact form sends, readable by the provincial
   youth head only. Messages are triaged (new / read / archived), never edited or
   deleted.
+- Venue check-in — per event, scan each QR pass with the phone camera (or a
+  handheld scanner, or type the code). A pass is admitted once, only at its own
+  event; live attendance count and undo. Scoped like the event itself.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -101,6 +104,7 @@ npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
+npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
 CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics` and `prove:keepalive` on every pull request.

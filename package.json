@@ -22,13 +22,15 @@
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
     "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs",
     "prove:contact": "node --conditions=react-server --experimental-strip-types scripts/prove-contact.mjs",
-    "prove:keepalive": "node --experimental-strip-types scripts/prove-keepalive.mjs"
+    "prove:keepalive": "node --experimental-strip-types scripts/prove-keepalive.mjs",
+    "prove:checkin": "node --experimental-strip-types scripts/prove-checkin.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.0",
+    "jsqr": "1.4.0",
     "lucide-react": "^0.469.0",
     "next": "15.1.12",
     "qrcode": "^1.5.4",
