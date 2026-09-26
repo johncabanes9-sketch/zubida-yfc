@@ -20,7 +20,8 @@
     "prove:a11y": "node scripts/prove-a11y.mjs",
     "prove:registration": "node scripts/prove-registration.mjs",
     "prove:chapters": "node --conditions=react-server --experimental-strip-types scripts/prove-chapters.mjs",
-    "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs"
+    "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs",
+    "prove:contact": "node --conditions=react-server --experimental-strip-types scripts/prove-contact.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
