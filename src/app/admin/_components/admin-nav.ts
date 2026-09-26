@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ClipboardList,
   FileText,
+  Inbox,
   ScrollText,
   Settings,
   UserCog,
@@ -13,6 +14,7 @@ import {
 export type Tab =
   | "registrations"
   | "events"
+  | "messages"
   | "chapters"
   | "leaders"
   | "pages"
@@ -47,6 +49,7 @@ export interface NavItem {
 export const NAV_ICONS: Record<Tab, LucideIcon> = {
   registrations: ClipboardList,
   events: CalendarDays,
+  messages: Inbox,
   chapters: Building2,
   leaders: Users,
   pages: FileText,
@@ -66,6 +69,7 @@ export const NAV_ICONS: Record<Tab, LucideIcon> = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: "registrations", href: "/admin", label: "Registrations", group: "Manage" },
   { key: "events", href: "/admin/events", label: "Events", group: "Manage" },
+  { key: "messages", href: "/admin/messages", label: "Messages", group: "Manage", pyhOnly: true },
   { key: "chapters", href: "/admin/chapters", label: "Chapters", group: "Organisation" },
   { key: "leaders", href: "/admin/leaders", label: "Leaders", group: "Organisation" },
   { key: "pages", href: "/admin/pages", label: "Pages", group: "Content", pyhOnly: true },

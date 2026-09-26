@@ -9,6 +9,7 @@ import {
 import { createServiceClient } from "@/lib/supabase/server";
 import { generateQrDataUrl, statusUrl } from "@/lib/qr";
 import { sendConfirmationEmail } from "@/lib/email/resend";
+import { verifyTurnstile, clientIp } from "@/lib/turnstile";
 import type { RegisterResult } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
@@ -20,41 +21,8 @@ function fail(code: RegistrationErrorCode) {
   );
 }
 
-async function verifyTurnstile(token: string | undefined, ip: string): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return true; // degraded mode: no captcha configured
-  // Half-configured is the dangerous state: the secret alone makes every
-  // registration fail CAPTCHA_FAILED, because no widget renders without the
-  // site key, so no token is ever submitted. It shipped that way once. Fail
-  // closed, but say why — a silent 400 on every submission is undiagnosable.
-  if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
-    console.error(
-      "TURNSTILE_SECRET_KEY is set but NEXT_PUBLIC_TURNSTILE_SITE_KEY is not. " +
-        "No captcha widget renders, so every registration will be rejected. " +
-        "Set both, or neither.",
-    );
-    return false;
-  }
-  if (!token) return false;
-  try {
-    const res = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ secret, response: token, remoteip: ip }),
-      },
-    );
-    const data = (await res.json()) as { success: boolean };
-    return data.success === true;
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0";
+  const ip = clientIp(req.headers);
 
   let raw: unknown;
   try {
