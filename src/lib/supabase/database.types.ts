@@ -166,6 +166,8 @@ export interface SiteSettingsRow {
   office: string;
   facebook_url: string | null;
   instagram_url: string | null;
+  /** Null on rows predating migration 0029; blank until the page is confirmed. */
+  tiktok_url: string | null;
   /** Canonical origin for metadataBase; null on rows predating migration 0018. */
   site_url: string | null;
   footer_explore_heading: string;
@@ -180,6 +182,16 @@ export interface NavItemRow {
   label: string;
   sort_order: number;
   visible: boolean;
+}
+
+/** A value in one of the registration form's editable dropdowns (0030).
+ *  `list_key` is constrained to 'gender' | 'shirt_size' by the table. */
+export interface OptionListRow {
+  id: string;
+  list_key: string;
+  value: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface PageRow {

@@ -27,7 +27,7 @@ const tryRead = (p) => { try { return read(p); } catch { return ""; } };
 const trySql = (p) => tryRead(p).replace(/^\s*--.*$/gm, "");
 const tryImport = async (p) => { try { return await import(p); } catch { return null; } };
 
-const { SITE } = await import("../src/lib/constants.ts");
+const { SITE, REGISTRATION_OPTIONS } = await import("../src/lib/constants.ts");
 const { PAGE_FALLBACK } = await import("../src/lib/pages/fallback.ts");
 const { isVerified } = await import("../src/lib/content/fixtures.ts");
 
@@ -35,6 +35,19 @@ const { isVerified } = await import("../src/lib/content/fixtures.ts");
 // 0013 seed and in 0022's guard, so the suite needs the literals to check both.
 const PLACEHOLDER_PHONE = "+63 962 000 0000";
 const PLACEHOLDER_EMAIL = "hello@zubidayfc.org";
+// The Facebook page 0013 invented, and the one the organization confirmed.
+// Both literals are needed: 0027 is guarded on the first and sets the second.
+const PLACEHOLDER_FACEBOOK = "https://facebook.com/zubidayfc";
+const VERIFIED_FACEBOOK = "https://www.facebook.com/yfczds";
+
+// 0007 seeded three cluster names taken from the Phase-1 chapter fixtures.
+// They were never the organization's clusters, which are Central, East and
+// West. Every chapter, leader and event carries a cluster_id, so the invented
+// names were not confined to a fixture file — they were the labels on real
+// admin dropdowns. 0028 renames the rows; the ids, and therefore every
+// reference to them, survive untouched.
+const INVENTED_CLUSTERS = ["Bay Cluster", "North Cluster", "South Cluster"];
+const CONFIRMED_CLUSTERS = ["Central Cluster", "East Cluster", "West Cluster"];
 
 let pass = 0, fail = 0;
 const check = (n, c, got) =>
@@ -57,7 +70,6 @@ for (const [field, value] of Object.entries({
   description: SITE.description,
   province: SITE.province,
   office: SITE.office,
-  facebook: SITE.socials.facebook,
   instagram: SITE.socials.instagram,
 })) {
   check(`site_settings seed matches SITE.${field}`, seedHas(value), value);
@@ -66,6 +78,18 @@ for (const [field, value] of Object.entries({
 // email and phone are deliberately absent from that loop. They are withheld
 // rather than matched, and 0013 still carries the stand-ins it seeded — §9
 // asserts that both sides are now blank instead.
+
+// facebook is absent for the same shape of reason, with the opposite outcome.
+// 0013 seeded an invented handle the audit flagged as never validated (§7.1);
+// the organization has since confirmed the real page, so 0027 corrects the
+// stored value rather than blanking it. 0013 still carries the stand-in, so
+// matching the seed against SITE would fail by design — §9 checks the
+// correction instead.
+check(
+  "SITE carries the confirmed Facebook page, not the invented handle",
+  SITE.socials.facebook === VERIFIED_FACEBOOK,
+  SITE.socials.facebook,
+);
 
 // site_url arrived in 0018, not the 0013 seed.
 const m18 = read("supabase/migrations/0018_site_url.sql");
@@ -446,6 +470,254 @@ check(
   null,
 );
 
+// The Facebook page is the one unverified claim in §7.1 that got confirmed
+// rather than withheld. 0027 has to move the stored value too — correcting
+// only the constant would leave the live footer pointing at the invented
+// handle for as long as the database is up, which is every normal day.
+const m27 = trySql("supabase/migrations/0027_verified_facebook_url.sql");
+check(
+  "migration 0027 stores the confirmed Facebook page",
+  m27.includes(VERIFIED_FACEBOOK) && /facebook_url\s*=\s*'https:\/\/www\.facebook\.com\/yfczds'/.test(m27),
+  null,
+);
+check(
+  "migration 0027 only corrects rows still carrying the invented handle",
+  /where[\s\S]*facebook_url\s*=\s*'https:\/\/facebook\.com\/zubidayfc'/i.test(m27),
+  PLACEHOLDER_FACEBOOK,
+);
+
+// The cluster names were the last invented identity still being shown to
+// administrators — every chapter, leader and event form listed them.
+const m28 = trySql("supabase/migrations/0028_confirmed_cluster_names.sql");
+for (const name of CONFIRMED_CLUSTERS) {
+  check(`migration 0028 stores the confirmed cluster "${name}"`, m28.includes(`'${name}'`), null);
+}
+for (const name of INVENTED_CLUSTERS) {
+  check(
+    `migration 0028 is guarded on the invented cluster "${name}"`,
+    new RegExp(`where[\\s\\S]*name\\s*=\\s*'${name}'`, "i").test(m28),
+    null,
+  );
+}
+// Renaming without moving the slug leaves /clusters?c=bay style values and the
+// row's own name disagreeing — the drift this suite exists to prevent.
+check(
+  "migration 0028 moves each slug with its name",
+  ["central", "east", "west"].every((s) => new RegExp(`slug\\s*=\\s*'${s}'`).test(m28)),
+  null,
+);
+
+// A placeholder is content too: "e.g. Bay Cluster" tells a registrant the
+// organization has a Bay Cluster, in the one field where they are being asked
+// to name their own.
+const regFormSource = code("src/components/shared/registration-form.tsx");
+check(
+  "the registration form suggests no invented cluster",
+  !INVENTED_CLUSTERS.some((c) => regFormSource.includes(c)),
+  INVENTED_CLUSTERS.filter((c) => regFormSource.includes(c)),
+);
+
+// -- 4c. TikTok is plumbed end to end before there is a URL to put in it -----
+// The organization has a TikTok presence to add later. "Later" is only a paste
+// if every layer already carries the field: a column to store it, a schema that
+// validates it, an action that persists it, a form that offers it, a fallback
+// that survives a DB outage, and a footer that renders it. Missing any one of
+// them turns a settings edit back into a deploy. The stored value is blank on
+// purpose until the real URL is confirmed — an unverified link is the mistake
+// 0027 just finished undoing.
+const m29 = trySql("supabase/migrations/0029_tiktok_url.sql");
+check(
+  "migration 0029 adds a column to store a TikTok URL",
+  /alter table site_settings[\s\S]*add column if not exists tiktok_url/i.test(m29),
+  null,
+);
+check(
+  "the settings schema validates the TikTok URL like the other socials",
+  /tiktok_url:\s*optionalUrl/.test(code("src/lib/validation/site.ts")),
+  null,
+);
+check(
+  "the settings action persists the TikTok URL",
+  /tiktok_url:\s*input\.tiktok_url\s*\|\|\s*null/.test(code("src/app/admin/settings/actions.ts")),
+  null,
+);
+check("the settings form offers a TikTok field", found("tiktok_url"), null);
+check(
+  "the row type carries tiktok_url",
+  /tiktok_url:\s*string\s*\|\s*null/.test(code("src/lib/supabase/database.types.ts")),
+  null,
+);
+check(
+  "the DB-outage fallback carries a TikTok slot",
+  /tiktok/.test(code("src/lib/data/site.ts")),
+  null,
+);
+// Blank must hide the icon, exactly as a withheld email hides its row. An
+// icon linking nowhere is worse than no icon.
+check(
+  "the footer omits the TikTok icon until a URL is set",
+  /\{\s*tiktok\s*&&/.test(footer),
+  null,
+);
+check(
+  "the TikTok URL ships blank rather than guessed",
+  SITE.socials.tiktok === "",
+  SITE.socials.tiktok,
+);
+
+// -- 4d. Gender and shirt size are lists, not code ---------------------------
+// Both shipped as arrays literal in registration-form.tsx, so adding a size or
+// changing how gender is worded was a deploy. They are the only two dropdowns
+// in the app that are pure value lists: registrations store them as plain text
+// (0002: `gender text`, `shirt_size text`), nothing branches on the values, and
+// no foreign key points at them. That is what makes them safe to hand over —
+// unlike event status and scope, which the code reads.
+const m30 = trySql("supabase/migrations/0030_option_lists.sql");
+check(
+  "migration 0030 creates the option_lists table",
+  /create table if not exists option_lists/i.test(m30),
+  null,
+);
+check(
+  "an option cannot be added to the same list twice",
+  /unique\s*\(\s*list_key\s*,\s*value\s*\)/i.test(m30),
+  null,
+);
+// Public read: the registration form is served to anonymous visitors.
+// PYH-only write: a cluster head editing the province's shirt sizes is the
+// same privilege break the RBAC work closed everywhere else.
+check(
+  "option_lists is readable by anonymous visitors",
+  /create policy option_lists_public_read[\s\S]*for select to anon, authenticated/i.test(m30),
+  null,
+);
+check(
+  "only the PYH may write option_lists",
+  /create policy option_lists_pyh_write[\s\S]*is_pyh\(auth\.uid\(\)\)/i.test(m30),
+  null,
+);
+// Same rule as the site_settings seed: the seed and the constants that back
+// the DB-outage fallback must not drift, or the form offers one set of sizes
+// when the database is up and another when it is down.
+for (const [key, values] of Object.entries(REGISTRATION_OPTIONS)) {
+  check(
+    `migration 0030 seeds every ${key} option from REGISTRATION_OPTIONS`,
+    values.every((v) => m30.includes(`'${v}'`)),
+    values.filter((v) => !m30.includes(`'${v}'`)),
+  );
+}
+
+// tryRead, not code: this file does not exist until the loader is written, and
+// a missing file must fail its own assertion rather than crash the suite.
+const optionsLoader = stripComments(tryRead("src/lib/data/options.ts"));
+check(
+  "an empty list falls back to the built-in options rather than an empty dropdown",
+  /length\s*>\s*0/.test(optionsLoader) && /REGISTRATION_OPTIONS/.test(optionsLoader),
+  null,
+);
+
+// The form must render what it is given. A literal array left behind would go
+// on being the real source while the admin edits a list that changes nothing.
+check(
+  "the registration form no longer hardcodes the shirt sizes",
+  !/const shirtSizes\s*=\s*\[/.test(regFormSource),
+  null,
+);
+check(
+  "the registration form no longer hardcodes the gender options",
+  !/<option>Prefer not to say<\/option>/.test(regFormSource),
+  null,
+);
+
+// -- 4e. The chapter dropdown reads the chapters the admin actually manages --
+// registration-form.tsx carried its own copy of the twelve chapters
+// ZUBIDA_CONTENT_AUDIT.md §5 recorded as FABRICATED. Removing them from
+// src/data/chapters.ts did not remove them from the public registration form,
+// where they went on being the list a member picked from — while /admin/chapters
+// managed a different set entirely.
+check(
+  "the registration form no longer hardcodes the fabricated chapters",
+  !/const chapters\s*=\s*\[/.test(regFormSource) && !/"Molave"/.test(regFormSource),
+  null,
+);
+check(
+  "chapter options come from published, undeleted chapters",
+  /getChapters\(\)/.test(optionsLoader),
+  null,
+);
+// getChapters() refuses a fixture fallback on purpose: an outage must not
+// resurrect invented chapters. The same rule has to hold here, so the loader
+// and the constants must carry no chapter names at all.
+check(
+  "an outage does not resurrect the fabricated chapters",
+  !/Molave|Labangan|Tukuran/.test(optionsLoader) &&
+    !/Molave|Labangan|Tukuran/.test(code("src/lib/constants.ts")),
+  null,
+);
+// Consequence of refusing that fallback: with nothing published there is
+// nothing to put in the dropdown, and chapter is a required field. The form
+// has to degrade to free text or registration stops working entirely.
+check(
+  "the chapter field stays answerable when no chapter is published",
+  /chapters\.length\s*>\s*0/.test(regFormSource),
+  null,
+);
+
+// The cluster set is closed — there are three, and 0028 names them. A free
+// text box invited a registrant to invent a fourth, or to spell one of the
+// three differently, leaving an admin to reconcile it by hand afterwards.
+check(
+  "cluster options come from the clusters table",
+  /from\("clusters"\)/.test(optionsLoader),
+  null,
+);
+check(
+  "the registration form offers the clusters as a dropdown",
+  /clusters\.length\s*>\s*0/.test(regFormSource),
+  null,
+);
+
+// -- 4f. An event with no cover renders no broken image ---------------------
+// events.cover is nullable (0001) but EventItem declared `cover: string`, and
+// the loader laundered the null into "" to satisfy it. Nobody guarded the
+// render, because the type said there was nothing to guard — so an event
+// without a cover reached <Image src=""> and logged two console errors on
+// every page that listed it. The type has to be honest before the guard can
+// be obviously necessary.
+check(
+  "EventItem admits that an event may have no cover",
+  /cover:\s*string\s*\|\s*null/.test(code("src/data/types.ts")),
+  null,
+);
+check(
+  "the events loader does not launder a missing cover into an empty string",
+  !/cover:\s*e\.cover\s*\?\?\s*""/.test(code("src/lib/data/events.ts")),
+  null,
+);
+check(
+  "the event card renders no image when there is no cover",
+  /\{\s*event\.cover\s*&&/.test(code("src/components/shared/event-card.tsx")),
+  null,
+);
+
+const optionActions = code("src/app/admin/settings/actions.ts");
+check(
+  "adding an option requires the PYH",
+  /export async function addRegistrationOption[\s\S]{0,200}requirePYH\(\)/.test(optionActions),
+  null,
+);
+check(
+  "deleting an option requires the PYH",
+  /export async function deleteRegistrationOption[\s\S]{0,200}requirePYH\(\)/.test(optionActions),
+  null,
+);
+check(
+  "both option writes are audited",
+  /audit\(ctx\.userId,\s*"option\.create"/.test(optionActions) &&
+    /audit\(ctx\.userId,\s*"option\.delete"/.test(optionActions),
+  null,
+);
+
 
 // -- 5. Every field the registration payload reads is actually submitted ------
 // A control with no `name` is omitted from FormData entirely, so `fd.get(...)`
@@ -472,6 +744,33 @@ check(
   "the consent checkbox is named, so consent:true can ever be sent",
   namedControls.has("consent"),
   [...namedControls].filter((n) => n.includes("consent")),
+);
+
+// The NOT_OURS exemption above is a promise that something else renders the
+// widget which injects that field. That promise was false for the whole life of
+// the form: /api/register verified cf-turnstile-response, nothing rendered a
+// widget, and setting TURNSTILE_SECRET_KEY would have rejected every single
+// registration. An exemption has to be backed by the thing it exempts.
+if (regForm.includes("cf-turnstile-response")) {
+  check(
+    "reading cf-turnstile-response means the form actually renders the widget",
+    /<Turnstile\b/.test(regForm),
+    "registration-form.tsx reads the Turnstile field but renders no widget",
+  );
+  // tryRead, not read: a deleted widget must fail this assertion, not crash the
+  // suite before the rest have run.
+  check(
+    "the Turnstile widget loads Cloudflare's script",
+    tryRead("src/components/shared/turnstile.tsx").includes("challenges.cloudflare.com/turnstile"),
+  );
+}
+
+// Both halves of the captcha are gated on env vars, and setting only the server
+// half breaks registration outright. The route must detect that, not just fail.
+const registerRoute = code("src/app/api/register/route.ts");
+check(
+  "the register route detects a half-configured captcha",
+  registerRoute.includes("NEXT_PUBLIC_TURNSTILE_SITE_KEY"),
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

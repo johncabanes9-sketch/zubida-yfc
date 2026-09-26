@@ -68,6 +68,9 @@ export function SettingsForm({
               <Field label="Instagram URL">
                 <Input name="instagram_url" defaultValue={settings.instagram_url ?? ""} />
               </Field>
+              <Field label="TikTok URL">
+                <Input name="tiktok_url" defaultValue={settings.tiktok_url ?? ""} />
+              </Field>
             </FieldGroup>
 
             <FieldGroup title="Footer">

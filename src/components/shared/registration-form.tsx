@@ -4,15 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, Info, Loader2 } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import {
+  DEFAULT_REGISTRATION_OPTIONS as FALLBACK_OPTIONS,
+  type RegistrationOptionLists,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, Input, Select } from "@/components/ui/field";
+import { Turnstile } from "./turnstile";
 
-const chapters = [
-  "Pagadian City", "Molave", "Labangan", "Aurora", "Tukuran",
-  "Margosatubig", "Tambulig", "Mahayag", "Dumingag", "San Miguel",
-  "Tabina", "Ramon Magsaysay",
-];
-const shirtSizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+/** Inlined at build time. Unset locally, which puts the server in degraded mode too. */
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type Success = { registrationId: string; qr: string };
 
@@ -49,7 +50,20 @@ function completion(form: HTMLFormElement): { done: number; total: number } {
   return { done, total: required.length };
 }
 
-export function RegistrationForm({ event }: { event: EventItem }) {
+/** `options` is threaded down from the server component that renders the event,
+ *  so the dropdowns are correct in the first paint rather than after a fetch.
+ *
+ *  The default covers the places (and tests) that render this form with no
+ *  database behind them. It carries the built-in gender and shirt sizes, which
+ *  the PYH edits in /admin/settings — but no chapters, because there is no such
+ *  thing as a built-in chapter. That field degrades to free text instead. */
+export function RegistrationForm({
+  event,
+  options = FALLBACK_OPTIONS,
+}: {
+  event: EventItem;
+  options?: RegistrationOptionLists;
+}) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Success | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -214,15 +228,13 @@ export function RegistrationForm({ event }: { event: EventItem }) {
           <Field label="Gender">
             <Select name="gender" defaultValue="">
               <option value="" disabled>Select…</option>
-              <option>Male</option>
-              <option>Female</option>
-              <option>Prefer not to say</option>
+              {options.gender.map((g) => <option key={g}>{g}</option>)}
             </Select>
           </Field>
           <Field label="T-shirt size">
             <Select name="shirt" defaultValue="">
               <option value="" disabled>Select…</option>
-              {shirtSizes.map((s) => <option key={s}>{s}</option>)}
+              {options.shirt_size.map((s) => <option key={s}>{s}</option>)}
             </Select>
           </Field>
         </div>
@@ -237,13 +249,35 @@ export function RegistrationForm({ event }: { event: EventItem }) {
             <Input type="tel" name="phone" required autoComplete="tel" />
           </Field>
           <Field label="Chapter" required>
-            <Select name="chapter" required defaultValue="">
-              <option value="" disabled>Select chapter…</option>
-              {chapters.map((c) => <option key={c}>{c}</option>)}
-            </Select>
+            {/* The list is the published chapters and nothing else — there is
+                no built-in fallback, because a fabricated chapter name is what
+                this form used to offer. With nothing published there is nothing
+                to choose from, and chapter is required, so the field degrades
+                to free text rather than to a dropdown that cannot be answered. */}
+            {options.chapters.length > 0 ? (
+              <Select name="chapter" required defaultValue="">
+                <option value="" disabled>Select chapter…</option>
+                {options.chapters.map((c) => <option key={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input name="chapter" required placeholder="Your chapter" />
+            )}
           </Field>
           <Field label="Cluster">
-            <Input name="cluster" placeholder="e.g. Bay Cluster" />
+            {/* The cluster set is closed — there are three, named by 0028 — so
+                this is a dropdown rather than the free text box it was. A text
+                box invited a registrant to invent a fourth cluster or spell one
+                of the three differently, leaving an admin to reconcile it by
+                hand. Optional, so a blank first option stays selectable.
+                Falls back to free text only if the table cannot be read. */}
+            {options.clusters.length > 0 ? (
+              <Select name="cluster" defaultValue="">
+                <option value="">Select cluster…</option>
+                {options.clusters.map((c) => <option key={c}>{c}</option>)}
+              </Select>
+            ) : (
+              <Input name="cluster" placeholder="Your cluster" />
+            )}
           </Field>
           <Field label="Parish">
             <Input name="parish" />
@@ -308,6 +342,8 @@ export function RegistrationForm({ event }: { event: EventItem }) {
           <span>{error}</span>
         </div>
       )}
+
+      {TURNSTILE_SITE_KEY && <Turnstile siteKey={TURNSTILE_SITE_KEY} />}
 
       <Button type="submit" size="lg" className="w-full" disabled={submitting || !consent}>
         {submitting ? (

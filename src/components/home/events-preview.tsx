@@ -3,9 +3,13 @@ import { SectionHeading } from "@/components/shared/section-heading";
 import { EventCard } from "@/components/shared/event-card";
 import { ButtonLink } from "@/components/ui/button";
 import { getEvents } from "@/lib/data/events";
+import { getRegistrationOptions } from "@/lib/data/options";
 
 export async function EventsPreview() {
-  const { events, status } = await getEvents();
+  const [{ events, status }, options] = await Promise.all([
+    getEvents(),
+    getRegistrationOptions(),
+  ]);
   const upcoming = events
     .filter((e) => e.status !== "Finished")
     .slice(0, 3);
@@ -26,7 +30,7 @@ export async function EventsPreview() {
         {upcoming.length > 0 ? (
           <div className="mt-12 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
             {upcoming.map((e, i) => (
-              <EventCard key={e.id} event={e} delay={i * 0.1} />
+              <EventCard key={e.id} event={e} options={options} delay={i * 0.1} />
             ))}
           </div>
         ) : (

@@ -67,7 +67,7 @@ Legend — **Accurate?**: `VERIFIED` = traceable to an authoritative project sou
 | Footer | Office "YFC Provincial Office, Pagadian City, Zamboanga del Sur" | `site_settings.office` | **UNVERIFIED — no street address** | fallback | ✅ | `site_settings` |
 | Footer | Email — was `hello@zubidayfc.org` | `site_settings.email` | **WITHHELD (0022)** — was UNVERIFIED, likely placeholder | fallback also blank | ✅ | `site_settings` |
 | Footer | Phone — was `+63 962 000 0000` | `site_settings.phone` | **WITHHELD (0022)** — was FABRICATED, `000 0000` is a placeholder pattern | fallback also blank | ✅ | `site_settings` |
-| Footer | Facebook `https://facebook.com/zubidayfc` | `site_settings.facebook_url` | **UNVERIFIED — never validated** | fallback | ✅ | `site_settings` |
+| Footer | Facebook `https://www.facebook.com/yfczds` | `site_settings.facebook_url` | **CORRECTED (0027)** — was `facebook.com/zubidayfc`, invented; page confirmed by the organization | fallback also corrected | ✅ | `site_settings` |
 | Footer | Instagram `https://instagram.com/zubidayfc` | `site_settings.instagram_url` | **UNVERIFIED — never validated** | fallback | ✅ | `site_settings` |
 | Footer | Copyright `© {year} {fullName}` | computed | VERIFIED | — | n/a | fine |
 | Footer | Closing line "Built for the youth of… Ad Majorem Dei Gloriam." | `site_settings.footer_closing_line` | UNVERIFIED | fallback | ✅ | `site_settings` |

@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/lib/constants";
 import { publishedContact } from "@/lib/content/contact";
-import { Sunburst } from "@/components/shared/sunburst";
+import { TikTokIcon } from "@/components/shared/tiktok-icon";
 import type { SiteSettings, NavItem } from "@/lib/data/site";
 
 export function Footer({
@@ -25,6 +26,7 @@ export function Footer({
   });
   const facebook = s?.socials.facebook ?? SITE.socials.facebook;
   const instagram = s?.socials.instagram ?? SITE.socials.instagram;
+  const tiktok = s?.socials.tiktok ?? SITE.socials.tiktok;
   const exploreHeading = s?.footerExploreHeading ?? "Explore";
   const reachHeading = s?.footerReachHeading ?? "Reach Us";
   const closingLine =
@@ -35,12 +37,16 @@ export function Footer({
       <div className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-radiant blur-2xl" />
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-dawn-soft text-gold-300">
-              <Sunburst className="h-6 w-6" rays={12} />
-            </span>
-            <span className="font-display text-xl font-semibold">{name}</span>
-          </div>
+          {/* Wider than the navbar's copy on purpose: this is the one place on
+              the page with room to render the lockup large enough that its own
+              "ZAMBOANGA DEL SUR" line is actually legible. */}
+          <Image
+            src="/logo.png"
+            alt={`${name} — CFC-YFC ${s?.province ?? SITE.province}`}
+            width={1200}
+            height={833}
+            className="h-auto w-52 sm:w-60"
+          />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-cream/70">
             {description}
           </p>
@@ -64,6 +70,15 @@ export function Footer({
                 className="grid h-10 w-10 place-items-center rounded-full border border-white/15 transition-colors hover:bg-white/10"
               >
                 <Instagram className="h-5 w-5" />
+              </a>
+            )}
+            {tiktok && (
+              <a
+                href={tiktok}
+                aria-label="TikTok"
+                className="grid h-10 w-10 place-items-center rounded-full border border-white/15 transition-colors hover:bg-white/10"
+              >
+                <TikTokIcon className="h-5 w-5" />
               </a>
             )}
           </div>
@@ -120,6 +135,18 @@ export function Footer({
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-cream/50 sm:flex-row sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} {fullName}. All rights reserved.</p>
           <p>{closingLine}</p>
+          {/* The only route into /admin/login from the site itself. It belongs
+              here and not in the primary nav: the leaders who need it are a
+              handful, and a login form beside "Events" invites everyone else to
+              try it. py-1.5 is not decoration — it lifts a 16px line box over
+              the 24px target-size floor prove:a11y enforces. */}
+          <Link
+            href="/admin/login"
+            prefetch={false}
+            className="inline-block py-1.5 text-cream/50 transition-colors hover:text-gold-300"
+          >
+            Admin sign in
+          </Link>
         </div>
       </div>
     </footer>

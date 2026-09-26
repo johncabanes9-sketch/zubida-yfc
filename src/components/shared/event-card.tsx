@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { CalendarDays, Clock, MapPin, Users } from "lucide-react";
 import type { EventItem } from "@/data/types";
+import type { RegistrationOptionLists } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EventModal } from "./event-modal";
@@ -13,7 +14,16 @@ import { Countdown } from "@/components/events/countdown";
 import { Badge, toneForStatus } from "@/components/ui/badge";
 import { share } from "@/lib/admin/metrics";
 
-export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: number }) {
+export function EventCard({
+  event,
+  options,
+  delay = 0,
+}: {
+  event: EventItem;
+  /** Passed through to the registration form inside the modal. */
+  options?: RegistrationOptionLists;
+  delay?: number;
+}) {
   const [open, setOpen] = useState(false);
   // share() guards the divide-by-zero. An event with no cap used to compute
   // 0/0 here, which rendered as `width: NaN%` — an invalid declaration the
@@ -24,14 +34,19 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
     <>
       <Reveal delay={delay}>
         <article className="group glass flex h-full flex-col overflow-hidden rounded-3xl shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:shadow-soft">
-          <div className="relative h-52 overflow-hidden">
-            <Image
-              src={event.cover}
-              alt={event.name}
-              fill
-              sizes="(max-width:768px) 100vw, 33vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
-            />
+          {/* The tint stays whether or not there is artwork, so a coverless
+              event reads as a card with no photo rather than a broken one.
+              Same treatment leader-card gives a leader with no photo. */}
+          <div className="relative h-52 overflow-hidden bg-royal-700/8 dark:bg-white/5">
+            {event.cover && (
+              <Image
+                src={event.cover}
+                alt={event.name}
+                fill
+                sizes="(max-width:768px) 100vw, 33vw"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-midnight-950/70 to-transparent" />
             <Badge
               tone={toneForStatus(event.status)}
@@ -111,7 +126,7 @@ export function EventCard({ event, delay = 0 }: { event: EventItem; delay?: numb
         </article>
       </Reveal>
 
-      <EventModal event={event} open={open} onClose={() => setOpen(false)} />
+      <EventModal event={event} options={options} open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

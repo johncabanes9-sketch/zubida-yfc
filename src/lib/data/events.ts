@@ -36,7 +36,7 @@ export async function getEvents(): Promise<EventsResult> {
     const events = (data as EventRowWithImages[]).map((e) => ({
       id: e.id,
       name: e.name,
-      cover: e.cover ?? "",
+      cover: e.cover ?? null,
       date: e.date,
       time: e.time ?? "",
       venue: e.venue ?? "",

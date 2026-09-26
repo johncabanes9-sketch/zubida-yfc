@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import Image from "next/image";
 import { NAV_LINKS, SITE } from "@/lib/constants";
-import { Sunburst } from "@/components/shared/sunburst";
 import { ThemeToggle } from "./theme-toggle";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -43,18 +43,21 @@ export function Navbar({
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="group flex items-center gap-2.5">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-dawn-soft text-gold-300 shadow-soft">
-            <Sunburst className="h-6 w-6" rays={12} />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="font-display text-lg font-semibold tracking-tight">
-              {site.name}
-            </span>
-            <span className="text-[0.62rem] uppercase tracking-[0.2em] text-muted">
-              {site.province}
-            </span>
-          </span>
+        {/* The lockup already reads "CFC-YFC ZUBIDA / ZAMBOANGA DEL SUR", so the
+            text block that used to sit beside the sunburst tile would say it
+            twice. The name now reaches assistive tech through the alt below,
+            which stays DB-driven rather than hardcoded. At this height the
+            artwork's own "ZAMBOANGA DEL SUR" line is decorative, not readable —
+            the footer renders the lockup large enough to carry it. */}
+        <Link href="/" className="group flex items-center">
+          <Image
+            src="/logo.png"
+            alt={`${site.name} — CFC-YFC ${site.province}`}
+            width={1200}
+            height={833}
+            priority
+            className="h-12 w-auto transition-transform duration-300 group-hover:scale-[1.03] sm:h-14"
+          />
         </Link>
 
         <ul className="hidden items-center gap-1 lg:flex">
