@@ -86,6 +86,7 @@ M failed` and exits non-zero on any failure.
 ```bash
 npm run prove:content      # 101 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
+npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
@@ -98,7 +99,7 @@ npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 ```
 
-CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.
+CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics` and `prove:keepalive` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
@@ -136,6 +137,22 @@ and a **dev server**. It starts its own `next dev` when nothing is answering on
 port 3000, or reuses one via `BASE_URL`. Do not point it at `npm start`: `/about`
 sets `revalidate = 60`, so a production server can serve cached HTML and the
 public-page assertions would read stale markup after a successful edit.
+
+## Keeping Supabase awake
+
+A free-tier Supabase project is paused after a week without activity, and a
+paused project takes every database-backed page and registration down with it.
+Public pages are ISR-cached, so visitors alone do not keep it awake.
+
+`vercel.json` schedules a daily Vercel Cron call (20:00 UTC, 04:00 in Manila)
+to `/api/cron/keepalive`, which runs one real query. It requires
+**`CRON_SECRET`** in the Vercel project's environment variables — Vercel sends
+it as a bearer token, and the route rejects every call without it. Unset, the
+route fails closed and the project can pause again, so set it before relying on
+this. A failed ping returns 503, which shows as a failed run under the
+project's **Cron Jobs** tab.
+
+Upgrading to Supabase Pro removes the pause entirely; the cron is then harmless.
 
 ## Project Structure
 
