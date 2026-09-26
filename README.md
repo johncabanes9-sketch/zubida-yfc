@@ -42,6 +42,9 @@ a real database, an authenticated admin surface, and a page CMS.
 - Venue check-in — per event, scan each QR pass with the phone camera (or a
   handheld scanner, or type the code). A pass is admitted once, only at its own
   event; live attendance count and undo. Scoped like the event itself.
+- Registrant export — one CSV per event (Excel-ready, UTF-8), scoped like the
+  event. Spreadsheet formulas typed into the form are neutralised, the pass
+  token is never included, and every export is audited.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -93,6 +96,7 @@ M failed` and exits non-zero on any failure.
 npm run prove:content      # 142 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
+npm run prove:export       # 35 — registrant CSV: injection, secrets, format; no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
@@ -107,7 +111,7 @@ npm run prove:contact      # 40 — the contact form, its gates, and the PYH-onl
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
-CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics` and `prove:keepalive` on every pull request.
+CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive` and `prove:export` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.

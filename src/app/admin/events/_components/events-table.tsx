@@ -79,6 +79,15 @@ export function EventsTable({ rows }: { rows: EventListRow[] }) {
           <ButtonLink href={`/admin/events/${e.id}/check-in`} size="xs" variant="subtle">
             Check-in
           </ButtonLink>
+          {/* A plain link, not client navigation: the route answers with a
+              file download, which the router would try to render as a page. */}
+          <a
+            href={`/admin/events/${e.id}/export`}
+            download
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-all duration-300 hover:bg-neutral-200 dark:bg-white/10 dark:text-neutral-300 dark:hover:bg-white/15"
+          >
+            Export CSV
+          </a>
           {e.status !== "Open" ? (
             <Button
               size="xs"

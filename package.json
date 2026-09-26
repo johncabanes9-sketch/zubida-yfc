@@ -23,7 +23,8 @@
     "prove:leaders": "node --conditions=react-server --experimental-strip-types scripts/prove-leaders.mjs",
     "prove:contact": "node --conditions=react-server --experimental-strip-types scripts/prove-contact.mjs",
     "prove:keepalive": "node --experimental-strip-types scripts/prove-keepalive.mjs",
-    "prove:checkin": "node --experimental-strip-types scripts/prove-checkin.mjs"
+    "prove:checkin": "node --experimental-strip-types scripts/prove-checkin.mjs",
+    "prove:export": "node --experimental-strip-types scripts/prove-export.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
