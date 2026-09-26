@@ -25,7 +25,7 @@ jobs:
 
       - run: npm run lint
 
-      # The two suites that need no database. prove:content reads the repo's own
+      # The suites that need no database. prove:content reads the repo's own
       # source of truth (constants, fallbacks, migrations, seeds); prove:metrics
       # exercises the dashboard's pure arithmetic. The other six need
       # SUPABASE_SERVICE_ROLE_KEY against a live project, and
@@ -38,4 +38,5 @@ jobs:
       # at production.
       - run: npm run prove:content
       - run: npm run prove:metrics
+      - run: npm run prove:keepalive
       - run: npm run prove:export

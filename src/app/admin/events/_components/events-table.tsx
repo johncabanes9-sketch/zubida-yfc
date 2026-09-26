@@ -76,6 +76,9 @@ export function EventsTable({ rows }: { rows: EventListRow[] }) {
           <ButtonLink href={`/admin/events/${e.id}/edit`} size="xs" variant="subtle">
             Edit
           </ButtonLink>
+          <ButtonLink href={`/admin/events/${e.id}/check-in`} size="xs" variant="subtle">
+            Check-in
+          </ButtonLink>
           {/* A plain link, not client navigation: the route answers with a
               file download, which the router would try to render as a page. */}
           <a
