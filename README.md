@@ -36,6 +36,9 @@ a real database, an authenticated admin surface, and a page CMS.
   without a recorded consent basis. Photo upload and consent withdrawal exist as
   server actions but are not yet wired into the admin form; that is the next
   slice.
+- Messages inbox — what the public contact form sends, readable by the provincial
+  youth head only. Messages are triaged (new / read / archived), never edited or
+  deleted.
 - Venue check-in — per event, scan each QR pass with the phone camera (or a
   handheld scanner, or type the code). A pass is admitted once, only at its own
   event; live attendance count and undo. Scoped like the event itself.
@@ -53,7 +56,7 @@ reach a public page until it is marked verified. Chapters no longer sit there �
 they are a managed database domain, and `/chapters` renders the empty-state
 notice until an administrator publishes a real one.
 
-`npm run prove:content` enforces this: 95 assertions covering identity
+`npm run prove:content` enforces this: 142 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Design
@@ -87,8 +90,9 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 101 assertions — needs no database
+npm run prove:content      # 142 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
+npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
@@ -99,10 +103,11 @@ npm run prove:a11y         # 64 — the public accessibility floor, in a real br
 npm run prove:registration # 26 — a member registering, in a real browser
 npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
+npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
-CI runs `tsc --noEmit`, `next lint`, and `prove:content` on every pull request.
+CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics` and `prove:keepalive` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
@@ -141,6 +146,22 @@ port 3000, or reuses one via `BASE_URL`. Do not point it at `npm start`: `/about
 sets `revalidate = 60`, so a production server can serve cached HTML and the
 public-page assertions would read stale markup after a successful edit.
 
+## Keeping Supabase awake
+
+A free-tier Supabase project is paused after a week without activity, and a
+paused project takes every database-backed page and registration down with it.
+Public pages are ISR-cached, so visitors alone do not keep it awake.
+
+`vercel.json` schedules a daily Vercel Cron call (20:00 UTC, 04:00 in Manila)
+to `/api/cron/keepalive`, which runs one real query. It requires
+**`CRON_SECRET`** in the Vercel project's environment variables — Vercel sends
+it as a bearer token, and the route rejects every call without it. Unset, the
+route fails closed and the project can pause again, so set it before relying on
+this. A failed ping returns 503, which shows as a failed run under the
+project's **Cron Jobs** tab.
+
+Upgrading to Supabase Pro removes the pause entirely; the cron is then harmless.
+
 ## Project Structure
 
 ```
@@ -164,6 +185,6 @@ src/
     data/           database reads with outage fallbacks
     rbac.ts validation/ email/ qr.ts constants.ts utils.ts
   middleware.ts     session refresh, 30-min idle timeout, admin route protection
-supabase/migrations/   27 ordered .sql migrations
+supabase/migrations/   ordered .sql migrations
 scripts/               db:migrate and the prove:* suites
 ```

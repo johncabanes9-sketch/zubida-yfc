@@ -103,6 +103,19 @@ export interface AdminRow {
   deleted_at: string | null;
 }
 
+export interface ContactMessageRow {
+  id: string;
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  status: "new" | "read" | "archived";
+  read_by: string | null;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 type Table<R, I, U> = { Row: R; Insert: I; Update: U; Relationships: [] };
 
 export interface Database {
@@ -124,6 +137,11 @@ export interface Database {
       chapters: Table<ChapterRow, Partial<ChapterRow>, Partial<ChapterRow>>;
       leaders: Table<LeaderRow, Partial<LeaderRow>, Partial<LeaderRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
+      contact_messages: Table<
+        ContactMessageRow,
+        Pick<ContactMessageRow, "name" | "email" | "subject" | "message">,
+        Partial<Pick<ContactMessageRow, "status" | "read_by" | "read_at">>
+      >;
     };
     Views: Record<string, never>;
     Functions: {
