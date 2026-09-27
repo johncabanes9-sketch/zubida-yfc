@@ -97,6 +97,7 @@ npm run prove:content      # 142 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:export       # 35 — registrant CSV: injection, secrets, format; no database
+npm run prove:env          # 29 — the deploy-time configuration check; no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer
 npm run prove:uploads      # 14 — image validation + storage ownership
@@ -111,7 +112,7 @@ npm run prove:contact      # 40 — the contact form, its gates, and the PYH-onl
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
-CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive` and `prove:export` on every pull request.
+CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive`, `prove:export` and `prove:env` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
 never at production.
@@ -149,6 +150,19 @@ and a **dev server**. It starts its own `next dev` when nothing is answering on
 port 3000, or reuses one via `BASE_URL`. Do not point it at `npm start`: `/about`
 sets `revalidate = 60`, so a production server can serve cached HTML and the
 public-page assertions would read stale markup after a successful edit.
+
+## Deploy configuration
+
+A Vercel **production** build fails if the site's required configuration is
+missing: `NEXT_PUBLIC_SUPABASE_URL` (a full `https://` URL),
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`,
+or only one of the two Turnstile keys. The build log names each problem, never
+a value, and Vercel keeps serving the previous deployment.
+
+This exists because production once ran for weeks with every Supabase variable
+set but empty: the public pages fell back to built-in content, so it looked
+fine, while admin, registration and the contact form were all dead. Preview
+builds only warn, and local builds are not checked (`src/lib/env/check.mjs`).
 
 ## Keeping Supabase awake
 
