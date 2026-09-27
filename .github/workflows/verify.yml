@@ -40,3 +40,4 @@ jobs:
       - run: npm run prove:metrics
       - run: npm run prove:keepalive
       - run: npm run prove:export
+      - run: npm run prove:env
