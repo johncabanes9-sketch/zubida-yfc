@@ -4,7 +4,7 @@
  * `src/data/*.ts` was authored during the Phase-1 visual showcase and is populated
  * with invented content: leader names and stock-photo faces, chapter rosters,
  * member counts, news articles, testimonial quotes, and a founding history.
- * Chapters, leaders and the gallery have since moved to managed tables. None
+ * Chapters, leaders, the gallery and news have since moved to managed tables. None
  * of it is traceable to Zubida YFC (see ZUBIDA_CONTENT_AUDIT.md §2).
  *
  * The data is kept in the repository — it defines the shape each page expects and
@@ -16,14 +16,11 @@
  * Do not set any of these to `true` to make a page "look finished".
  */
 export type FixtureDomain =
-  | "news"
   | "testimonials"
   | "aboutHistory"
   | "photography";
 
 const VERIFIED: Record<FixtureDomain, boolean> = {
-  /** src/data/news.ts — 6 invented articles attributed to named authors. */
-  news: false,
   /** src/data/stats.ts testimonials — 4 invented quotes attributed to named people. */
   testimonials: false,
   /** About timeline — 6 dated historical milestones, founding year unsourced. */

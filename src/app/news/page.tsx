@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { NewsBoard } from "@/components/news/news-board";
 import { UnpublishedNotice } from "@/components/shared/unpublished-notice";
-import { isVerified } from "@/lib/content/fixtures";
+import { getNewsPosts } from "@/lib/data/news";
 
 export const metadata: Metadata = {
   title: "News",
@@ -10,7 +10,11 @@ export const metadata: Metadata = {
     "Announcements, articles, blogs, and videos from the Zubida YFC community in Zamboanga del Sur.",
 };
 
-export default function NewsPage() {
+// Admin actions revalidate /news on every change; this is the backstop.
+export const revalidate = 60;
+
+export default async function NewsPage() {
+  const posts = await getNewsPosts();
   return (
     <>
       <PageHeader
@@ -25,8 +29,8 @@ export default function NewsPage() {
         <h2 id="news-list" className="sr-only">
           News and updates
         </h2>
-        {isVerified("news") ? (
-          <NewsBoard />
+        {posts.length > 0 ? (
+          <NewsBoard posts={posts} />
         ) : (
           <UnpublishedNotice
             title="No stories published yet"

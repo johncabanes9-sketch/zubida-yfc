@@ -2,35 +2,31 @@
 
 import { useMemo, useState } from "react";
 import { Newspaper, Search } from "lucide-react";
-import { news } from "@/data/news";
-import type { NewsCategory } from "@/data/types";
+import type { PublicNewsPost } from "@/lib/data/news";
 import { NewsCard } from "@/components/shared/news-card";
 import { cn } from "@/lib/utils";
 
-const categories: (NewsCategory | "All")[] = [
-  "All",
-  "Announcement",
-  "Article",
-  "Blog",
-  "Video",
-];
+const ALL = "All";
 
-export function NewsBoard() {
+export function NewsBoard({ posts }: { posts: PublicNewsPost[] }) {
+  // Only formats that published posts actually use, so no chip leads to an
+  // empty board.
+  const categories = useMemo(() => [ALL, ...new Set(posts.map((p) => p.category))], [posts]);
   const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<(typeof categories)[number]>("All");
+  const [cat, setCat] = useState<string>(ALL);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return news.filter((n) => {
+    return posts.filter((n) => {
       const matchesQ =
         !q ||
         n.title.toLowerCase().includes(q) ||
         n.excerpt.toLowerCase().includes(q) ||
-        n.author.toLowerCase().includes(q);
-      const matchesCat = cat === "All" || n.category === cat;
+        (n.author ?? "").toLowerCase().includes(q);
+      const matchesCat = cat === ALL || n.category === cat;
       return matchesQ && matchesCat;
     });
-  }, [query, cat]);
+  }, [query, cat, posts]);
 
   return (
     <div>
@@ -41,6 +37,7 @@ export function NewsBoard() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search stories…"
+            aria-label="Search stories"
             className="w-full rounded-full border border-black/10 bg-white/70 py-3 pl-12 pr-4 text-sm outline-none transition-colors focus:border-royal-500 dark:border-white/10 dark:bg-midnight-800"
           />
         </div>
@@ -49,6 +46,7 @@ export function NewsBoard() {
             <button
               key={c}
               onClick={() => setCat(c)}
+              aria-pressed={cat === c}
               className={cn(
                 "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
                 cat === c

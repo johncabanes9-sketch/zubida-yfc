@@ -136,6 +136,28 @@ export interface GalleryPhotoRow {
   deleted_at: string | null;
 }
 
+export type NewsCategoryDb = "Announcement" | "Article" | "Blog" | "Video";
+
+export interface NewsPostRow {
+  id: string;
+  title: string;
+  excerpt: string;
+  category: NewsCategoryDb;
+  /** null = withheld; never a stand-in byline. */
+  author: string | null;
+  external_url: string | null;
+  published_on: string;
+  cover_path: string | null;
+  cover_consent_confirmed_at: string | null;
+  cover_consent_confirmed_by: string | null;
+  is_published: boolean;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+}
+
 type Table<R, I, U> = { Row: R; Insert: I; Update: U; Relationships: [] };
 
 export interface Database {
@@ -157,6 +179,7 @@ export interface Database {
       chapters: Table<ChapterRow, Partial<ChapterRow>, Partial<ChapterRow>>;
       leaders: Table<LeaderRow, Partial<LeaderRow>, Partial<LeaderRow>>;
       gallery_photos: Table<GalleryPhotoRow, Partial<GalleryPhotoRow>, Partial<GalleryPhotoRow>>;
+      news_posts: Table<NewsPostRow, Partial<NewsPostRow>, Partial<NewsPostRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
       contact_messages: Table<
         ContactMessageRow,
