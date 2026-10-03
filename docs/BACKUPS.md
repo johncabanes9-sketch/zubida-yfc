@@ -1,13 +1,14 @@
 # Database backups
 
 Supabase's free tier keeps no point-in-time recovery. Every night at 02:00
-Manila time, the `backup` GitHub Action dumps the production database,
-checks the dump is complete, **encrypts it**, and keeps it as a workflow
-artifact for 30 days.
+Manila time, the `backup` GitHub Action runs two jobs, `backup` (the
+database) and `media` (the uploaded photo files). Each one checks its
+archive is complete, **encrypts it**, and keeps it as a workflow artifact for
+30 days.
 
 The repository is public, and workflow artifacts on a public repository can
 be downloaded by any signed-in GitHub user. The data includes minors'
-registration details. So every backup is encrypted with your `age` public
+registration details and photos of people. So every backup is encrypted with your `age` public
 key before it leaves the runner. Only your private key can open it, and that
 key never goes to GitHub.
 
@@ -20,9 +21,12 @@ key never goes to GitHub.
 | `storage.dump` | `storage.buckets` and `storage.objects`: the list of uploaded files, **not the files themselves**. |
 | `manifest.tsv` | Row count per table at backup time, to check a restore against. |
 
-**Not included:** the image files in the `media` bucket (gallery photos, leader
-photos, covers). They need a separate storage backup. Until then, keep the
-originals of anything you upload.
+The **photos** archive (`zubida-media-<run id>`) holds every file in the `media`
+bucket: gallery, leader, news and testimonial photos, event and page images.
+Its `manifest.tsv` lists each file's name, size and sha256. The files are
+fetched by their public URL, and the file list comes from the database
+connection, so no service-role key is ever given to GitHub. A failed download
+or a size mismatch fails the job.
 
 ## One-time setup
 
@@ -46,11 +50,12 @@ originals of anything you upload.
    ```sh
    gh secret set BACKUP_AGE_RECIPIENT   # paste the age1… public key
    gh secret set BACKUP_DATABASE_URL    # paste the session pooler URI
+   gh secret set BACKUP_SUPABASE_URL    # https://<project>.supabase.co (Settings → API)
    ```
 
 3. **Run it once** to confirm: GitHub → Actions → **backup** → *Run workflow*,
-   or `gh workflow run backup`. It should turn green, with one
-   `zubida-db-<run id>` artifact attached.
+   or `gh workflow run backup`. Both jobs should turn green, with a
+   `zubida-db-<run id>` artifact and a `zubida-media-<run id>` artifact attached.
 
 A run with either secret missing fails red on purpose.
 
@@ -78,7 +83,20 @@ A run with either secret missing fails red on purpose.
    The integrity triggers therefore don't block restored rows, and the foreign
    keys are checked once at the end.
 
-3. Compare row counts against `manifest.tsv`, point the site's environment
+3. Restore the photos. Decrypt the `zubida-media-…` archive the same way, then,
+   with `.env.local` pointing at the **new** project, run:
+
+   ```sh
+   node scripts/backup/restore-media.mjs <unpacked-dir> --dry-run   # see what it would do
+   node scripts/backup/restore-media.mjs <unpacked-dir>
+   ```
+
+   It checks every file against the manifest's sha256 before uploading. It
+   skips files that are already there, so you can safely run it again. It
+   exits non-zero if anything fails. Restore `storage.dump` (step 2) only
+   after the files are back.
+
+4. Compare row counts against `manifest.tsv`, point the site's environment
    variables at the new project, and redeploy.
 
 Practise this once, into a throwaway project, before you need it.
@@ -93,5 +111,10 @@ Practise this once, into a throwaway project, before you need it.
 - It decrypts the backup and checks every table is in the archive.
 - It also checks that missing or invalid inputs are refused.
 
+It also round-trips the photos. The TEST bucket keeps two permanent probe
+files under `backup-probe/` (one name has a space and parentheses). They are
+checked byte for byte after decryption, so don't delete them.
+
 It needs the `BACKUP_VERIFY_DATABASE_URL` secret, set to the TEST project's
-session URI and **never production**. Without that secret, it skips.
+session URI and **never production**, and `BACKUP_VERIFY_SUPABASE_URL`, set to
+the TEST project URL. Without them, it skips.
