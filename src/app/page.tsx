@@ -8,6 +8,7 @@ import { Testimonials } from "@/components/home/testimonials";
 import { VerseBanner } from "@/components/home/verse-banner";
 import { getSiteSettings } from "@/lib/data/site";
 import { isVerified } from "@/lib/content/fixtures";
+import { getGalleryPhotos } from "@/lib/data/gallery";
 
 // The homepage renders <EventsPreview />, which reads live events. Without this
 // it is prerendered at build and serves stale (or, on an empty table, mock)
@@ -15,18 +16,19 @@ import { isVerified } from "@/lib/content/fixtures";
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const { site } = await getSiteSettings();
+  const [{ site }, photos] = await Promise.all([getSiteSettings(), getGalleryPhotos(5)]);
   return (
     <>
       <Hero province={site.province} name={site.name} description={site.description} />
       <StatsBand />
       <AboutTeaser />
       <EventsPreview />
-      {/* News, photos, and testimonials are omitted entirely rather than shown
-          with Phase-1 placeholder content — an absent section is honest, a
-          section filled with invented stories is not. */}
+      {/* News and testimonials are omitted entirely rather than shown with
+          Phase-1 placeholder content — an absent section is honest, a section
+          filled with invented stories is not. Photos come from the managed
+          gallery and the section appears once one is published. */}
       {isVerified("news") && <NewsPreview />}
-      {isVerified("gallery") && <FeaturedPhotos />}
+      {photos.length > 0 && <FeaturedPhotos photos={photos} />}
       {isVerified("testimonials") && <Testimonials />}
       <VerseBanner />
     </>

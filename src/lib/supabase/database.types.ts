@@ -116,6 +116,26 @@ export interface ContactMessageRow {
   updated_at: string;
 }
 
+export interface GalleryPhotoRow {
+  id: string;
+  /** null only once the photo is deleted (its file is reaped with it). */
+  path: string | null;
+  caption: string;
+  category: string | null;
+  width: number;
+  height: number;
+  cluster_id: string | null;
+  consent_confirmed_at: string;
+  consent_confirmed_by: string;
+  is_published: boolean;
+  sort_order: number;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+}
+
 type Table<R, I, U> = { Row: R; Insert: I; Update: U; Relationships: [] };
 
 export interface Database {
@@ -136,6 +156,7 @@ export interface Database {
       admins: Table<AdminRow, Partial<AdminRow>, Partial<AdminRow>>;
       chapters: Table<ChapterRow, Partial<ChapterRow>, Partial<ChapterRow>>;
       leaders: Table<LeaderRow, Partial<LeaderRow>, Partial<LeaderRow>>;
+      gallery_photos: Table<GalleryPhotoRow, Partial<GalleryPhotoRow>, Partial<GalleryPhotoRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
       contact_messages: Table<
         ContactMessageRow,
