@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type LeaderQueryRow = Pick<
   LeaderRow,
   | "id" | "name" | "position" | "chapter_id" | "cluster_id" | "message"
-  | "facebook_url" | "instagram_url" | "is_published"
+  | "facebook_url" | "instagram_url" | "is_published" | "photo_path" | "consent_at"
 > & {
   chapters: { name: string } | null;
   clusters: { name: string } | null;
@@ -22,7 +22,7 @@ export default async function LeadersAdmin() {
   const { data: leadersData } = await supabase
     .from("leaders")
     .select(
-      "id, name, position, chapter_id, cluster_id, message, facebook_url, instagram_url, is_published, chapters(name), clusters(name)",
+      "id, name, position, chapter_id, cluster_id, message, facebook_url, instagram_url, is_published, photo_path, consent_at, chapters(name), clusters(name)",
     )
     .is("deleted_at", null)
     .order("name", { ascending: true });
@@ -43,6 +43,8 @@ export default async function LeadersAdmin() {
     facebook_url: l.facebook_url,
     instagram_url: l.instagram_url,
     is_published: l.is_published,
+    photo_path: l.photo_path,
+    consent_at: l.consent_at,
     chapter_name: l.chapters?.name ?? null,
     cluster_name: l.clusters?.name ?? null,
   }));
