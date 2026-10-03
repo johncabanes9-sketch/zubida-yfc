@@ -23,15 +23,6 @@ export interface EventItem {
   images?: EventImage[];
 }
 
-export interface Testimonial {
-  id: string;
-  name: string;
-  role: string;
-  chapter: string;
-  quote: string;
-  avatar: string;
-}
-
 export interface Stat {
   label: string;
   value: number;
