@@ -140,6 +140,10 @@ check("the uploader sends the consent tick", /\.append\("consent",/.test(form), 
 check("upload is disabled until consent is ticked", /disabled=\{[^}]*!consent[^}]*\}/.test(form), null);
 check("an oversized photo is refused before it is sent",
   /file\.size > MAX_PHOTO_BYTES[\s\S]{0,300}return;[\s\S]{0,600}uploadGalleryPhoto\(/.test(form), null);
+// React 19 resets an uncontrolled <form action={fn}> as soon as fn returns;
+// run() returns before the server answers, so a rejected save wiped what the
+// admin typed. Forms submit through onSubmit + preventDefault instead.
+check("no admin form resets before the server has answered", !/<form\s[^>]*?action=\{/.test(form), null);
 check("deleting a photo asks first", /confirm\([^)]*\)\)\s*return;\s*\n\s*run\(\(\) => deleteGalleryPhoto/.test(form), null);
 
 console.log("\n── Public pages (source-level) ──");
@@ -280,6 +284,11 @@ try {
   const stolen = await head.from("gallery_photos").insert(row({ path: pubAPath, consent_confirmed_by: headId })).select("id");
   check("a row cannot reuse another photo's file", !!stolen.error, stolen.data);
   const reconsent = await head.from("gallery_photos").update({ consent_confirmed_by: headId }).eq("id", draftA).select("id");
+  const stale = await head.from("gallery_photos").insert(row({ path: await realObject(), consent_confirmed_by: headId, consent_confirmed_at: "2020-01-01T00:00:00Z", caption: "Suite stale" })).select("consent_confirmed_at").single();
+  check("the permission time is stamped by the database, not supplied by the caller",
+    !stale.error && Date.now() - Date.parse(stale.data.consent_confirmed_at) < 5 * 60 * 1000, stale.error?.message ?? stale.data);
+  const spoofEditor = await head.from("gallery_photos").update({ caption: "Suite spoof", updated_by: pyhId }).eq("id", draftA).select("updated_by").single();
+  check("updated_by records the real editor", spoofEditor.data?.updated_by === headId, spoofEditor.error?.message ?? spoofEditor.data);
   check("a cluster head CANNOT rewrite who confirmed permission", !!reconsent.error || (reconsent.data ?? []).length === 0, reconsent.data);
   const repoint = await head.from("gallery_photos").update({ path: await realObject() }).eq("id", draftA).select("id");
   check("a cluster head CANNOT repoint a photo at a different file", !!repoint.error || (repoint.data ?? []).length === 0, repoint.data);

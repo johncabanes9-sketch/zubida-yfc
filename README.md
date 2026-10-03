@@ -116,7 +116,7 @@ npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
-npm run prove:gallery      # 77 — the photo gallery: dimensions, RLS, consent, guards
+npm run prove:gallery      # 80 — the photo gallery: dimensions, RLS, consent, guards
 ```
 
 CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive`, `prove:export` and `prove:env` on every pull request.

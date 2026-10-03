@@ -128,9 +128,14 @@ begin
     ) then
       raise exception 'gallery photo file does not exist' using errcode = '23514';
     end if;
+    -- Who and when are the database's to record, not the caller's to supply.
     new.created_by := auth.uid();
+    new.updated_by := auth.uid();
+    new.consent_confirmed_at := now();
     return new;
   end if;
+
+  new.updated_by := auth.uid();
 
   -- UPDATE: provenance is fixed at upload. A photo can be re-captioned,
   -- published or deleted, never re-attributed or pointed at another file.

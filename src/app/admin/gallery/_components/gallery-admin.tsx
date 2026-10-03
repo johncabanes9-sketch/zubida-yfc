@@ -324,7 +324,16 @@ function EditForm({
   onSubmit: (fd: FormData) => void;
 }) {
   return (
-    <form action={(fd: FormData) => onSubmit(fd)} className="mt-2 grid gap-3">
+    <form
+      // onSubmit, not a form action: React 19 resets a form whose action returns,
+      // and onSubmit returns before the server answers — a rejected save would
+      // wipe what was typed.
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(new FormData(e.currentTarget));
+      }}
+      className="mt-2 grid gap-3"
+    >
       <label className="block">
         <span className={labelClass}>Caption</span>
         <input name="caption" required maxLength={300} defaultValue={photo.caption} className={fieldClass} />
