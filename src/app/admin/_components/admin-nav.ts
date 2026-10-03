@@ -5,6 +5,7 @@ import {
   FileText,
   Images,
   Inbox,
+  MessageSquareQuote,
   Newspaper,
   ScrollText,
   Settings,
@@ -21,6 +22,7 @@ export type Tab =
   | "leaders"
   | "gallery"
   | "news"
+  | "testimonials"
   | "pages"
   | "users"
   | "logs"
@@ -58,6 +60,7 @@ export const NAV_ICONS: Record<Tab, LucideIcon> = {
   leaders: Users,
   gallery: Images,
   news: Newspaper,
+  testimonials: MessageSquareQuote,
   pages: FileText,
   users: UserCog,
   logs: ScrollText,
@@ -80,6 +83,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: "leaders", href: "/admin/leaders", label: "Leaders", group: "Organisation" },
   { key: "gallery", href: "/admin/gallery", label: "Gallery", group: "Content" },
   { key: "news", href: "/admin/news", label: "News", group: "Content", pyhOnly: true },
+  { key: "testimonials", href: "/admin/testimonials", label: "Testimonials", group: "Content", pyhOnly: true },
   { key: "pages", href: "/admin/pages", label: "Pages", group: "Content", pyhOnly: true },
   { key: "users", href: "/admin/users", label: "Users", group: "Organisation", pyhOnly: true },
   { key: "logs", href: "/admin/logs", label: "Logs", group: "Content", pyhOnly: true },

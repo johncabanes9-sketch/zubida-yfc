@@ -45,6 +45,10 @@ a real database, an authenticated admin surface, and a page CMS.
   optional author and cover) that link out to the full story, usually the
   Facebook post; https links only. No on-site article bodies, no invented read
   times; a cover needs the same recorded permission as a gallery photo.
+- Testimonials — the provincial youth head publishes a person's words under
+  their name only with their recorded consent; changing the words needs consent
+  again, and the database records who took it and when. Deleting erases the
+  name, words and photo (a withdrawal leaves nothing behind). No stock faces.
 - Messages inbox — what the public contact form sends, readable by the provincial
   youth head only. Messages are triaged (new / read / archived), never edited or
   deleted.
@@ -65,11 +69,11 @@ phone number renders as no phone row at all, not as a stand-in.
 Phase-1 fixtures still live in `src/data/` for the domains that have not been
 migrated yet, and every one of them sits behind a publication gate: it does not
 reach a public page until it is marked verified. Chapters, leaders, the
-gallery and news no longer sit there — they are managed database domains, and their
+gallery, news and testimonials no longer sit there — they are managed database domains, and their
 pages render the empty-state notice until an administrator publishes real
 content.
 
-`npm run prove:content` enforces this: 140 assertions covering identity
+`npm run prove:content` enforces this: 139 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Design
@@ -103,7 +107,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 140 assertions — needs no database
+npm run prove:content      # 139 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:export       # 35 — registrant CSV: injection, secrets, format; no database
@@ -122,6 +126,7 @@ npm run prove:contact      # 40 — the contact form, its gates, and the PYH-onl
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 npm run prove:gallery      # 80 — the photo gallery: dimensions, RLS, consent, guards
 npm run prove:news         # 63 — news cards: links, covers, PYH-only RLS, guards
+npm run prove:testimonials # 63 — testimonials: consent per quote, erase on delete
 ```
 
 CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive`, `prove:export` and `prove:env` on every pull request.

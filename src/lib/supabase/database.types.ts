@@ -158,6 +158,25 @@ export interface NewsPostRow {
   deleted_at: string | null;
 }
 
+export interface TestimonialRow {
+  id: string;
+  /** name/role/quote/photo_path are null only on an erased (deleted) row. */
+  name: string | null;
+  role: string | null;
+  quote: string | null;
+  photo_path: string | null;
+  chapter_id: string | null;
+  consent_at: string;
+  consent_by: string;
+  is_published: boolean;
+  sort_order: number;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  updated_by: string | null;
+  deleted_at: string | null;
+}
+
 type Table<R, I, U> = { Row: R; Insert: I; Update: U; Relationships: [] };
 
 export interface Database {
@@ -180,6 +199,7 @@ export interface Database {
       leaders: Table<LeaderRow, Partial<LeaderRow>, Partial<LeaderRow>>;
       gallery_photos: Table<GalleryPhotoRow, Partial<GalleryPhotoRow>, Partial<GalleryPhotoRow>>;
       news_posts: Table<NewsPostRow, Partial<NewsPostRow>, Partial<NewsPostRow>>;
+      testimonials: Table<TestimonialRow, Partial<TestimonialRow>, Partial<TestimonialRow>>;
       clusters: Table<ClusterRow, Partial<ClusterRow>, Partial<ClusterRow>>;
       contact_messages: Table<
         ContactMessageRow,
