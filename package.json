@@ -26,7 +26,8 @@
     "prove:checkin": "node --experimental-strip-types scripts/prove-checkin.mjs",
     "prove:export": "node --experimental-strip-types scripts/prove-export.mjs",
     "prove:env": "node scripts/prove-env.mjs",
-    "prove:gallery": "node --conditions=react-server --experimental-strip-types scripts/prove-gallery.mjs"
+    "prove:gallery": "node --conditions=react-server --experimental-strip-types scripts/prove-gallery.mjs",
+    "prove:news": "node --conditions=react-server --experimental-strip-types scripts/prove-news.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

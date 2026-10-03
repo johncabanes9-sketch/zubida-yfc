@@ -23,23 +23,6 @@ export interface EventItem {
   images?: EventImage[];
 }
 
-export type NewsCategory =
-  | "Announcement"
-  | "Article"
-  | "Blog"
-  | "Video";
-
-export interface NewsItem {
-  id: string;
-  title: string;
-  excerpt: string;
-  category: NewsCategory;
-  date: string; // ISO
-  author: string;
-  cover: string;
-  readTime: number;
-}
-
 export interface Testimonial {
   id: string;
   name: string;

@@ -1,10 +1,11 @@
 import { ArrowRight } from "lucide-react";
-import { news } from "@/data/news";
+import type { PublicNewsPost } from "@/lib/data/news";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { NewsCard } from "@/components/shared/news-card";
 import { ButtonLink } from "@/components/ui/button";
 
-export function NewsPreview() {
+/** Rendered only when at least one post is published (see app/page.tsx). */
+export function NewsPreview({ posts }: { posts: PublicNewsPost[] }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-end justify-between gap-6">
@@ -18,7 +19,7 @@ export function NewsPreview() {
         </ButtonLink>
       </div>
       <div className="mt-12 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
-        {news.slice(0, 3).map((n, i) => (
+        {posts.slice(0, 3).map((n, i) => (
           <NewsCard key={n.id} item={n} delay={i * 0.1} />
         ))}
       </div>
