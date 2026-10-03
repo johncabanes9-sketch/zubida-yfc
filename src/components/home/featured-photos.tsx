@@ -1,12 +1,13 @@
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { gallery } from "@/data/gallery";
+import type { PublicPhoto } from "@/lib/data/gallery";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/shared/reveal";
 
-export function FeaturedPhotos() {
-  const shots = gallery.slice(0, 5);
+/** Rendered only when at least one photo is published (see app/page.tsx). */
+export function FeaturedPhotos({ photos }: { photos: PublicPhoto[] }) {
+  const shots = photos.slice(0, 5);
   return (
     <section className="bg-cream-100 py-24 dark:bg-midnight-900/40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
