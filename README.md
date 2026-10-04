@@ -112,6 +112,10 @@ npm run prove:contact      # 40 — the contact form, its gates, and the PYH-onl
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 ```
 
+Nightly encrypted backups of the database and the uploaded photos run as the
+`backup` GitHub Action; setup,
+restore, and what is (and is not) covered are in [docs/BACKUPS.md](docs/BACKUPS.md).
+
 CI runs `tsc --noEmit`, `next lint`, `prove:content`, `prove:metrics`, `prove:keepalive`, `prove:export` and `prove:env` on every pull request.
 The database-backed suites are a local pre-merge step: they need service-role
 credentials and they mutate shared data, so point them at a throwaway project,
