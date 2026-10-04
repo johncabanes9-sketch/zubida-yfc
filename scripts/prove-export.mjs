@@ -125,7 +125,7 @@ check("the export route authorizes against the event's cluster", /requireCluster
 check("the registrant read goes through the RLS-bound client", /createServerSupabase\(\)/.test(route), null);
 check("the registrant read selects only exported columns, never qr_token",
   /REGISTRANT_SELECT/.test(route) && !/qr_token/.test(route) && !/select\(\s*["']\*["']/.test(route), null);
-check("the export is audited", /audit_log/.test(route), null);
+check("the export is audited", /recordAudit\(\{[\s\S]{0,120}registrations\.export/.test(route), null);
 check("the response is never cached", /no-store/.test(route), null);
 check("the events list offers the export", /\/export/.test(code("src/app/admin/events/_components/events-table.tsx")), null);
 

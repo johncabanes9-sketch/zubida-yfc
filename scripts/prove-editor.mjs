@@ -254,7 +254,7 @@ try {
     check("the Pages tab is offered to a PYH", await page.getByRole("link", { name: "Pages", exact: true }).count() === 1, null);
     const pyhNav = await sidebarLinks(page);
     check("the PYH sidebar offers every section, grouped in order",
-      JSON.stringify(pyhNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders","Users","Pages","Logs","Settings"]), pyhNav);
+      JSON.stringify(pyhNav) === JSON.stringify(["Registrations","Events","Messages","Chapters","Leaders","Users","Pages","Logs","Settings"]), pyhNav);
     await page.goto(`${BASE_URL}/admin/pages`);
     check("the pages list links to the About editor", await page.locator(`a[href="/admin/pages/${SLUG}/edit"]`).count() === 1, null);
     await page.goto(`${BASE_URL}/admin/pages/${SLUG}/edit`);

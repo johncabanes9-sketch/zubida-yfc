@@ -1,22 +1,16 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, requirePYH } from "@/lib/supabase/admin-auth";
-import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { siteSettingsSchema, registrationOptionSchema } from "@/lib/validation/site";
 
-async function audit(
+function audit(
   userId: string,
   action: string,
   entity = "site_settings",
   entityId = "1",
 ) {
-  try {
-    await createServiceClient()
-      .from("audit_log")
-      .insert({ actor_user_id: userId, action, entity, entity_id: entityId });
-  } catch {
-    // audit is best-effort; never block the save on logging failure
-  }
+  return recordAudit({ actorUserId: userId, action, entity, entityId });
 }
 
 export async function updateSiteSettings(formData: FormData) {

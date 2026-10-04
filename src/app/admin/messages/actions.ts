@@ -1,19 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requirePYH, createServerSupabase } from "@/lib/supabase/admin-auth";
-import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 
 export type MessageStatus = "new" | "read" | "archived";
 
 const STATUSES: readonly MessageStatus[] = ["new", "read", "archived"];
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log")
-      .insert({ actor_user_id: userId, action, entity: "contact_messages", entity_id: id });
-  } catch {
-    // best-effort; never block the triage on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "contact_messages", entityId: id });
 }
 
 /**
