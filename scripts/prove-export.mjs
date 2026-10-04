@@ -17,7 +17,7 @@ const check = (n, c, got) => c
 const code = (p) => { try { return readFileSync(join(root, p), "utf8"); } catch { return ""; } };
 
 const { toCsv, csvCell } = await import("../src/lib/export/csv.ts");
-const { REGISTRANT_COLUMNS, registrantsCsv, exportFilename } = await import("../src/lib/export/registrants.ts");
+const { REGISTRANT_COLUMNS, REGISTRANT_SELECT, registrantsCsv, exportFilename } = await import("../src/lib/export/registrants.ts");
 
 console.log("\n── csvCell ──");
 
@@ -76,6 +76,40 @@ check("the details organizers plan with are present",
   ["Asthma", "No pork", "Ana Santos", "0917 111 2222", ",M,"].every((s) => row.includes(s)), row);
 check("an empty list still yields a header row", registrantsCsv([]).replace(/^﻿/, "") === header + "\r\n", registrantsCsv([]));
 
+console.log("\n── Check-in columns ──");
+
+// The organizer's post-event question is "who actually came". Arrived is
+// derived from checked_in_at rather than stored, so the two can never disagree.
+const cell = (r, h) => {
+  const rows = registrantsCsv([r]).replace(/^﻿/, "").split("\r\n");
+  const i = rows[0].split(",").indexOf(h);
+  return i === -1 ? undefined : rows[1].split(",")[i];
+};
+const arrived = { ...reg, chapter: "Molave", checked_in_at: "2026-12-01T00:05:00Z", check_in_method: "qr",
+  checked_in_by: "a9f1-door-volunteer-uuid" };
+const absent = { ...reg, chapter: "Molave", checked_in_at: null, check_in_method: null, checked_in_by: null };
+for (const h of ["Arrived", "Checked in at (Manila)", "Check-in method"]) {
+  check(`the header carries "${h}"`, header.split(",").includes(h), header);
+}
+check("a checked-in registrant reads Arrived = Yes", cell(arrived, "Arrived") === "Yes", cell(arrived, "Arrived"));
+check("check-in time is in Manila time", cell(arrived, "Checked in at (Manila)") === "2026-12-01 08:05",
+  cell(arrived, "Checked in at (Manila)"));
+check("a QR check-in reads QR", cell(arrived, "Check-in method") === "QR", cell(arrived, "Check-in method"));
+check("a typed-code check-in reads Manual",
+  cell({ ...arrived, check_in_method: "manual" }, "Check-in method") === "Manual",
+  cell({ ...arrived, check_in_method: "manual" }, "Check-in method"));
+check("a registrant who never arrived reads Arrived = No with blank time and method",
+  cell(absent, "Arrived") === "No" && cell(absent, "Checked in at (Manila)") === ""
+  && cell(absent, "Check-in method") === "", [cell(absent, "Arrived"), cell(absent, "Checked in at (Manila)")]);
+// Who scanned the pass is an internal auth id, not something to forward.
+check("the door volunteer's user id is never exported",
+  !registrantsCsv([arrived]).includes(arrived.checked_in_by)
+  && !REGISTRANT_SELECT.split(", ").includes("checked_in_by"), REGISTRANT_SELECT);
+check("the select names each column once",
+  new Set(REGISTRANT_SELECT.split(", ")).size === REGISTRANT_SELECT.split(", ").length, REGISTRANT_SELECT);
+check("the select reads the check-in columns",
+  ["checked_in_at", "check_in_method"].every((k) => REGISTRANT_SELECT.split(", ").includes(k)), REGISTRANT_SELECT);
+
 console.log("\n── exportFilename ──");
 
 const fn = exportFilename("Youth Camp: Pagadian / 2026", "2026-12-01");
@@ -91,7 +125,7 @@ check("the export route authorizes against the event's cluster", /requireCluster
 check("the registrant read goes through the RLS-bound client", /createServerSupabase\(\)/.test(route), null);
 check("the registrant read selects only exported columns, never qr_token",
   /REGISTRANT_SELECT/.test(route) && !/qr_token/.test(route) && !/select\(\s*["']\*["']/.test(route), null);
-check("the export is audited", /audit_log/.test(route), null);
+check("the export is audited", /recordAudit\(\{[\s\S]{0,120}registrations\.export/.test(route), null);
 check("the response is never cached", /no-store/.test(route), null);
 check("the events list offers the export", /\/export/.test(code("src/app/admin/events/_components/events-table.tsx")), null);
 

@@ -3,14 +3,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePYH } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { createUserSchema, editUserSchema, passwordSchema } from "@/lib/validation/user";
 
-async function audit(userId: string, action: string, target: string) {
-  try {
-    await createServiceClient().from("audit_log").insert({ actor_user_id: userId, action, entity: "admins", entity_id: target });
-  } catch {
-    // audit is best-effort; never block the mutation on logging failure
-  }
+function audit(userId: string, action: string, target: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "admins", entityId: target });
 }
 
 export async function createClusterHead(formData: FormData) {

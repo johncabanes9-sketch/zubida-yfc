@@ -254,7 +254,7 @@ try {
     check("the Pages tab is offered to a PYH", await page.getByRole("link", { name: "Pages", exact: true }).count() === 1, null);
     const pyhNav = await sidebarLinks(page);
     check("the PYH sidebar offers every section, grouped in order",
-      JSON.stringify(pyhNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders","Users","Pages","Logs","Settings"]), pyhNav);
+      JSON.stringify(pyhNav) === JSON.stringify(["Registrations","Events","Messages","Chapters","Leaders","Users","Gallery","News","Pages","Logs","Settings"]), pyhNav);
     await page.goto(`${BASE_URL}/admin/pages`);
     check("the pages list links to the About editor", await page.locator(`a[href="/admin/pages/${SLUG}/edit"]`).count() === 1, null);
     await page.goto(`${BASE_URL}/admin/pages/${SLUG}/edit`);
@@ -371,7 +371,7 @@ try {
       check("no Pages tab is offered to a cluster head", await chPage.getByRole("link", { name: "Pages", exact: true }).count() === 0, null);
       const chNav = await sidebarLinks(chPage);
       check("the cluster head sidebar withholds every PYH-only section",
-        JSON.stringify(chNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders"]), chNav);
+        JSON.stringify(chNav) === JSON.stringify(["Registrations","Events","Chapters","Leaders","Gallery"]), chNav);
       await chPage.goto(`${BASE_URL}/admin/pages`);
       check("the cluster head is redirected away from the pages list", chPage.url().includes("/admin?error=forbidden"), chPage.url());
       await chPage.goto(`${BASE_URL}/admin/pages/${SLUG}/edit`);

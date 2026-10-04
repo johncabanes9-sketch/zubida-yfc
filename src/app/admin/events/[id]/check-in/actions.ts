@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { loadAdminContext, createServerSupabase } from "@/lib/supabase/admin-auth";
-import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { parsePass } from "@/lib/checkin/parse";
 
 export type CheckInCode =
@@ -27,13 +27,8 @@ export type CheckInResult = {
   };
 };
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log")
-      .insert({ actor_user_id: userId, action, entity: "event_registrations", entity_id: id });
-  } catch {
-    // best-effort; never block the door on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "event_registrations", entityId: id });
 }
 
 /**

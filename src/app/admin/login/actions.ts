@@ -2,22 +2,18 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { createServerSupabase } from "@/lib/supabase/admin-auth";
-import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 
 async function logAuth(action: string, userId: string | null, email: string) {
+  // Audit never blocks sign-in or sign-out: recordAudit cannot throw, and
+  // the IP lookup is guarded the same way.
+  let ip: string | null = null;
   try {
-    const hdrs = await headers();
-    const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-    await createServiceClient().from("audit_log").insert({
-      actor_user_id: userId,
-      action,
-      entity: "auth",
-      entity_id: email,
-      meta: { ip },
-    });
+    ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   } catch {
-    // audit is best-effort; never block login on logging failure
+    // no request headers available; record the entry without an IP
   }
+  await recordAudit({ actorUserId: userId, action, entity: "auth", entityId: email, meta: { ip } });
 }
 
 export async function signIn(formData: FormData) {
