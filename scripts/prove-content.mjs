@@ -277,6 +277,11 @@ check(
   statsBand.includes("getSiteStats") && !statsBand.includes('from "@/data/stats"'),
   null,
 );
+check(
+  "the invented stats figures are gone from src/data/stats.ts",
+  !/export const stats\b/.test(read("src/data/stats.ts")),
+  null,
+);
 const statsLib = code("src/lib/data/stats.ts");
 check(
   "derived stats contain no hardcoded figures",

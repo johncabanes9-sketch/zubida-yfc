@@ -1,11 +1,4 @@
-import type { Stat, Verse } from "./types";
-
-export const stats: Stat[] = [
-  { label: "Chapters", value: 26, suffix: "" },
-  { label: "Active Members", value: 4200, suffix: "+" },
-  { label: "Provincial Events", value: 58, suffix: "" },
-  { label: "Trained Leaders", value: 340, suffix: "+" },
-];
+import type { Verse } from "./types";
 
 export const verses: Verse[] = [
   {
