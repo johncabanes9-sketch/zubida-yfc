@@ -40,6 +40,10 @@ a real database, an authenticated admin surface, and a page CMS.
   record of who confirmed permission to publish it; its real dimensions
   (phone rotation applied) are read from the file. Drafts until published;
   public filters come from the categories real photos carry.
+- News — the provincial youth head posts cards (title, summary, format, date,
+  optional author and cover) that link out to the full story, usually the
+  Facebook post; https links only. No on-site article bodies, no invented read
+  times; a cover needs the same recorded permission as a gallery photo.
 - Messages inbox — what the public contact form sends, readable by the provincial
   youth head only. Messages are triaged (new / read / archived), never edited or
   deleted.
@@ -60,8 +64,8 @@ phone number renders as no phone row at all, not as a stand-in.
 
 Phase-1 fixtures still live in `src/data/` for the domains that have not been
 migrated yet, and every one of them sits behind a publication gate: it does not
-reach a public page until it is marked verified. Chapters, leaders and the
-gallery no longer sit there — they are managed database domains, and their
+reach a public page until it is marked verified. Chapters, leaders, the
+gallery and news no longer sit there — they are managed database domains, and their
 pages render the empty-state notice until an administrator publishes real
 content.
 
@@ -117,6 +121,7 @@ npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
 npm run prove:gallery      # 80 — the photo gallery: dimensions, RLS, consent, guards
+npm run prove:news         # 63 — news cards: links, covers, PYH-only RLS, guards
 ```
 
 Nightly encrypted backups of the database and the uploaded photos run as the
