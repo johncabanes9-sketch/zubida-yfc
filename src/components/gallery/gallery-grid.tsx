@@ -4,28 +4,24 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Lock, X } from "lucide-react";
-import { gallery } from "@/data/gallery";
-import type { GalleryCategory } from "@/data/types";
+import type { PublicPhoto } from "@/lib/data/gallery";
 import { cn } from "@/lib/utils";
 
-const categories: (GalleryCategory | "All")[] = [
-  "All",
-  "Youth Camp",
-  "Provincial Conference",
-  "ICON",
-  "Household",
-  "CLS",
-  "Sports Fest",
-  "Mission Activities",
-];
+const ALL = "All";
 
-export function GalleryGrid() {
-  const [cat, setCat] = useState<(typeof categories)[number]>("All");
+export function GalleryGrid({ photos }: { photos: PublicPhoto[] }) {
+  // Filters are the categories published photos actually carry — no invented
+  // taxonomy, and no filter that would show an empty grid.
+  const categories = useMemo(
+    () => [ALL, ...[...new Set(photos.map((p) => p.category).filter((c): c is string => !!c))].sort()],
+    [photos],
+  );
+  const [cat, setCat] = useState<string>(ALL);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
   const shown = useMemo(
-    () => (cat === "All" ? gallery : gallery.filter((p) => p.category === cat)),
-    [cat],
+    () => (cat === ALL ? photos : photos.filter((p) => p.category === cat)),
+    [cat, photos],
   );
 
   const move = (d: number) => {
@@ -38,22 +34,25 @@ export function GalleryGrid() {
   return (
     <div>
       {/* Filters */}
-      <div className="mb-8 flex flex-wrap gap-2">
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => setCat(c)}
-            className={cn(
-              "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
-              cat === c
-                ? "bg-dawn-soft text-white shadow-soft"
-                : "bg-royal-700/8 text-muted hover:bg-royal-700/15 dark:bg-white/5",
-            )}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
+      {categories.length > 2 && (
+        <div className="mb-8 flex flex-wrap gap-2">
+          {categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCat(c)}
+              aria-pressed={cat === c}
+              className={cn(
+                "rounded-full px-4 py-2 text-xs font-semibold transition-colors",
+                cat === c
+                  ? "bg-dawn-soft text-white shadow-soft"
+                  : "bg-royal-700/8 text-muted hover:bg-royal-700/15 dark:bg-white/5",
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mb-6 flex items-center gap-2 text-xs text-muted">
         <Lock className="h-3.5 w-3.5" /> Images are protected — downloading is disabled.
@@ -75,16 +74,18 @@ export function GalleryGrid() {
             <Image
               src={p.src}
               alt={p.caption}
-              width={p.span === "wide" ? 900 : 700}
-              height={p.span === "tall" ? 900 : p.span === "wide" ? 600 : 700}
+              width={p.width}
+              height={p.height}
               sizes="(max-width:768px) 50vw, 25vw"
               className="w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
             <div className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-midnight-950/80 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100">
               <div className="p-4">
-                <span className="text-xs font-semibold uppercase tracking-wide text-gold-300">
-                  {p.category}
-                </span>
+                {p.category && (
+                  <span className="text-xs font-semibold uppercase tracking-wide text-gold-300">
+                    {p.category}
+                  </span>
+                )}
                 <p className="text-sm text-white">{p.caption}</p>
               </div>
             </div>
@@ -135,14 +136,16 @@ export function GalleryGrid() {
               <Image
                 src={shown[lightbox].src}
                 alt={shown[lightbox].caption}
-                width={1200}
-                height={900}
+                width={shown[lightbox].width}
+                height={shown[lightbox].height}
                 className="mx-auto max-h-[80vh] w-auto rounded-2xl object-contain"
               />
               <figcaption className="mt-4 text-center text-cream">
-                <span className="text-xs font-semibold uppercase tracking-wide text-gold-300">
-                  {shown[lightbox].category}
-                </span>
+                {shown[lightbox].category && (
+                  <span className="text-xs font-semibold uppercase tracking-wide text-gold-300">
+                    {shown[lightbox].category}
+                  </span>
+                )}
                 <p className="text-sm">{shown[lightbox].caption}</p>
               </figcaption>
             </motion.figure>

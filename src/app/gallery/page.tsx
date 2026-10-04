@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { GalleryGrid } from "@/components/gallery/gallery-grid";
 import { UnpublishedNotice } from "@/components/shared/unpublished-notice";
-import { isVerified } from "@/lib/content/fixtures";
+import { getGalleryPhotos } from "@/lib/data/gallery";
 
 export const metadata: Metadata = {
   title: "Gallery",
@@ -10,7 +10,11 @@ export const metadata: Metadata = {
     "Photos from Zubida YFC camps, conferences, households, seminars, sports fests, and mission activities.",
 };
 
-export default function GalleryPage() {
+// Admin actions revalidate /gallery on every change; this is the backstop.
+export const revalidate = 60;
+
+export default async function GalleryPage() {
+  const photos = await getGalleryPhotos();
   return (
     <>
       <PageHeader
@@ -25,8 +29,8 @@ export default function GalleryPage() {
         <h2 id="gallery-list" className="sr-only">
           Photo gallery
         </h2>
-        {isVerified("gallery") ? (
-          <GalleryGrid />
+        {photos.length > 0 ? (
+          <GalleryGrid photos={photos} />
         ) : (
           <UnpublishedNotice
             title="No photos published yet"

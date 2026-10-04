@@ -40,23 +40,6 @@ export interface NewsItem {
   readTime: number;
 }
 
-export type GalleryCategory =
-  | "Youth Camp"
-  | "Provincial Conference"
-  | "ICON"
-  | "Household"
-  | "CLS"
-  | "Sports Fest"
-  | "Mission Activities";
-
-export interface Photo {
-  id: string;
-  src: string;
-  caption: string;
-  category: GalleryCategory;
-  span: "tall" | "wide" | "normal";
-}
-
 export interface Testimonial {
   id: string;
   name: string;

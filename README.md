@@ -35,6 +35,11 @@ a real database, an authenticated admin surface, and a page CMS.
   provincial youth head manages all. A photo or a personal quote cannot be stored
   without a recorded consent basis. The admin form uploads, replaces and removes
   the photo (up to 4MB), and withdrawing consent clears the photo and quote.
+- Photo gallery — cluster heads upload and manage their own cluster's photos,
+  the provincial youth head manages all. A photo cannot be stored without a
+  record of who confirmed permission to publish it; its real dimensions
+  (phone rotation applied) are read from the file. Drafts until published;
+  public filters come from the categories real photos carry.
 - Messages inbox — what the public contact form sends, readable by the provincial
   youth head only. Messages are triaged (new / read / archived), never edited or
   deleted.
@@ -55,11 +60,12 @@ phone number renders as no phone row at all, not as a stand-in.
 
 Phase-1 fixtures still live in `src/data/` for the domains that have not been
 migrated yet, and every one of them sits behind a publication gate: it does not
-reach a public page until it is marked verified. Chapters no longer sit there —
-they are a managed database domain, and `/chapters` renders the empty-state
-notice until an administrator publishes a real one.
+reach a public page until it is marked verified. Chapters, leaders and the
+gallery no longer sit there — they are managed database domains, and their
+pages render the empty-state notice until an administrator publishes real
+content.
 
-`npm run prove:content` enforces this: 142 assertions covering identity
+`npm run prove:content` enforces this: 140 assertions covering identity
 consistency, fallback/seed drift, placeholder media, and the publication gate.
 
 ## Design
@@ -93,7 +99,7 @@ Each `prove:*` script is a standalone assertion suite that prints `N passed,
 M failed` and exits non-zero on any failure.
 
 ```bash
-npm run prove:content      # 142 assertions — needs no database
+npm run prove:content      # 140 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
 npm run prove:export       # 46 — registrant CSV: injection, secrets, format; no database
@@ -110,6 +116,7 @@ npm run prove:chapters     # 33 — the chapters directory, RLS and withholding
 npm run prove:leaders      # 83 — the leadership directory, RLS and consent
 npm run prove:contact      # 40 — the contact form, its gates, and the PYH-only inbox
 npm run prove:checkin      # 31 — venue check-in: pass parsing, admit-once, scope
+npm run prove:gallery      # 80 — the photo gallery: dimensions, RLS, consent, guards
 ```
 
 Nightly encrypted backups of the database and the uploaded photos run as the

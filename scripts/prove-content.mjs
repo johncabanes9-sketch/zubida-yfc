@@ -175,7 +175,7 @@ check("migration 0017 rewrites the chapter-count sentence", m17.includes("twenty
 // ── 3. Placeholder media is never rendered unconditionally ─────────────────
 // The fixture modules may keep their stock URLs; the surfaces that render them
 // must be gated.
-for (const page of ["news", "gallery"]) {
+for (const page of ["news"]) {
   const src = read(`src/app/${page}/page.tsx`);
   check(
     `/${page} gates its fixture content behind isVerified`,
@@ -185,7 +185,14 @@ for (const page of ["news", "gallery"]) {
 }
 
 const home = read("src/app/page.tsx");
-for (const section of ["NewsPreview", "FeaturedPhotos", "Testimonials"]) {
+// The gallery is a managed table now (0034): its homepage section renders only
+// when real photos exist, never from the fixture.
+check(
+  "homepage renders <FeaturedPhotos/> only when published photos exist",
+  /photos\.length\s*>\s*0\s*&&\s*<FeaturedPhotos/.test(home),
+  null,
+);
+for (const section of ["NewsPreview", "Testimonials"]) {
   check(
     `homepage renders <${section}/> only when its content is verified`,
     new RegExp(`isVerified\\([^)]*\\)\\s*&&\\s*<${section}`).test(home),
@@ -201,7 +208,7 @@ check(
 // ── 4. Fixture gates stay shut until content is confirmed ──────────────────
 // These flip only when an administrator supplies verified content — and the
 // domain should move to a managed table at that point, not stay a fixture.
-for (const domain of ["news", "gallery", "testimonials", "aboutHistory", "photography"]) {
+for (const domain of ["news", "testimonials", "aboutHistory", "photography"]) {
   check(`fixture domain "${domain}" is not published as fact`, isVerified(domain) === false, domain);
 }
 
