@@ -86,8 +86,21 @@ const helpers = new Set(["src/lib/audit.ts", "src/lib/supabase/audit.ts"]);
 const offenders = walk(join(root, "src"))
   .map((p) => relative(root, p).replaceAll("\\", "/"))
   .filter((p) => !helpers.has(p))
-  .filter((p) => /from\(\s*["']audit_log["']\s*\)\s*\.insert/.test(readFileSync(join(root, p), "utf8")));
+  .filter((p) => {
+    // Catches a split chain (const t = db.from("audit_log"); t.insert(…)) too:
+    // any file naming the table that also inserts anything is suspect.
+    const src = readFileSync(join(root, p), "utf8");
+    return /["']audit_log["']/.test(src) && /\.insert\(/.test(src);
+  });
 check("no file inserts into audit_log directly", offenders.length === 0, offenders);
+
+// The headline fix: approve/reject used the session client, which RLS refuses.
+const status = readFileSync(join(root, "src/app/admin/actions.ts"), "utf8");
+check("registration approve/reject audits through the service-role helper",
+  /recordAudit\(\{[\s\S]{0,200}registration\.\$\{status\}/.test(status), null);
+
+const login = readFileSync(join(root, "src/app/admin/login/actions.ts"), "utf8");
+check("sign-in audit cannot throw on the header read", /try\s*\{\s*\n?\s*ip\s*=\s*\(await headers\(\)\)/.test(login), null);
 
 const wrapper = readFileSync(join(root, "src/lib/supabase/audit.ts"), "utf8");
 check("the server wrapper uses the service client", /createServiceClient\(\)/.test(wrapper), null);

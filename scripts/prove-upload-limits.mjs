@@ -58,6 +58,10 @@ for (const p of uploaders) {
 const events = read("src/app/admin/events/_components/event-images-manager.tsx");
 check("event images are sent one file per request", /for\s*\(\s*const\s+\w+\s+of\s+files\s*\)[\s\S]{0,400}uploadEventImages\(/.test(events), null);
 check("event images no longer advertise the 5MB server limit", !/MAX_BYTES\s*\/\s*1024/.test(events), null);
+check("a thrown upload mid-batch is reported, not left unhandled", /catch\s*\{[\s\S]{0,200}ACTION_FAILED/.test(events), null);
+// The size check guards the send: it returns before start() is reached.
+check("the size check runs before any request is started",
+  events.indexOf("uploadTooLarge)") > -1 && events.indexOf("uploadTooLarge)") < events.indexOf("start(async"), null);
 
 console.log("\n── Forms keep what was typed when a save is refused ──");
 
@@ -66,8 +70,14 @@ console.log("\n── Forms keep what was typed when a save is refused ──");
 // onSubmit + preventDefault leaves the fields alone.
 for (const p of ["src/app/admin/chapters/_components/chapter-form.tsx", "src/app/admin/pages/_components/page-editor.tsx"]) {
   const src = read(p);
-  check(`${p.split("/").pop()} has no client <form action>`, !/<form[^>]*\saction=\{/.test(src), null);
-  check(`${p.split("/").pop()} prevents the default submit`, /preventDefault\(\)/.test(src), null);
+  const name = p.split("/").pop();
+  // Every <form> element opens with onSubmit, and no action={…} prop exists
+  // anywhere in the file (comments mention "<form action>" in prose only).
+  const forms = src.match(/<form\s(?!action>)/g) ?? [];
+  const guarded = src.match(/<form\s+onSubmit=\{\(e\)\s*=>\s*\{\s*e\.preventDefault\(\);/g) ?? [];
+  check(`${name}: every form submits via onSubmit + preventDefault`, forms.length > 0 && guarded.length === forms.length, { forms: forms.length, guarded: guarded.length });
+  check(`${name}: no action={…} prop`, !/\saction=\{/.test(src), null);
+  check(`${name}: a thrown action shows a notice`, /catch\s*\{[\s\S]{0,200}ACTION_FAILED/.test(src), null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

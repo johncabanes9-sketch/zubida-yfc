@@ -7,6 +7,7 @@ import { ChevronDown, Eye, EyeOff, MoveDown, MoveUp, Plus, Trash2 } from "lucide
 import { Button } from "@/components/ui/button";
 import type { EditorField } from "@/lib/pages/registry";
 import { uploadTooLarge } from "@/lib/images/upload-limit";
+import { ACTION_FAILED } from "@/lib/admin/notices";
 import {
   addSection,
   deleteSection,
@@ -53,8 +54,13 @@ export function PageEditor({
   const run = (fn: () => Promise<{ error?: string }>, okText: string) => {
     setNotice(null);
     start(async () => {
-      const res = await fn();
-      setNotice(res.error ? { kind: "error", text: res.error } : { kind: "ok", text: okText });
+      try {
+        const res = await fn();
+        setNotice(res.error ? { kind: "error", text: res.error } : { kind: "ok", text: okText });
+      } catch {
+        // A thrown action (e.g. an expired session) would otherwise be silent.
+        setNotice({ kind: "error", text: ACTION_FAILED });
+      }
     });
   };
 
@@ -77,12 +83,10 @@ export function PageEditor({
       {/* onSubmit, not <form action>: React 19 resets an action form as soon
           as the action returns, so a refused save would wipe the fields. */}
       <form
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          const res = await updatePageSeo(pageId, new FormData(e.currentTarget));
-          setNotice(
-            res.error ? { kind: "error", text: res.error } : { kind: "ok", text: "SEO saved." },
-          );
+          const formData = new FormData(e.currentTarget);
+          run(() => updatePageSeo(pageId, formData), "SEO saved.");
         }}
         className="glass grid max-w-2xl gap-4 rounded-2xl p-6"
       >
@@ -102,7 +106,7 @@ export function PageEditor({
           />
         </label>
         <div>
-          <Button type="submit" size="sm">Save SEO</Button>
+          <Button type="submit" size="sm" disabled={pending}>Save SEO</Button>
         </div>
       </form>
 

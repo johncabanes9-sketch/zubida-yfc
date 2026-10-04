@@ -5,8 +5,14 @@ import { createServerSupabase } from "@/lib/supabase/admin-auth";
 import { recordAudit } from "@/lib/supabase/audit";
 
 async function logAuth(action: string, userId: string | null, email: string) {
-  const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  // Audit never blocks sign-in or sign-out: recordAudit cannot throw, and
+  // the IP lookup is guarded the same way.
+  let ip: string | null = null;
+  try {
+    ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  } catch {
+    // no request headers available; record the entry without an IP
+  }
   await recordAudit({ actorUserId: userId, action, entity: "auth", entityId: email, meta: { ip } });
 }
 

@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition, type ChangeEvent, type FormEvent } 
 import { deleteEventImage, reorderEventImage, uploadEventImages } from "../actions";
 import { ALLOWED_MIME, MAX_FILES } from "@/lib/images/validate";
 import { uploadTooLarge } from "@/lib/images/upload-limit";
+import { ACTION_FAILED } from "@/lib/admin/notices";
 
 export type EventImageRow = { id: string; url: string; alt: string | null };
 
@@ -55,7 +56,13 @@ export function EventImagesManager({
       for (const file of files) {
         const fd = new FormData();
         fd.append("images", file);
-        const res = await uploadEventImages(eventId, fd);
+        let res: { error?: string };
+        try {
+          res = await uploadEventImages(eventId, fd);
+        } catch {
+          // e.g. the session expired mid-batch: report it like any refusal.
+          res = { error: ACTION_FAILED };
+        }
         if (res.error) {
           setError(sent === 0 ? res.error : `${sent} of ${files.length} uploaded. ${res.error}`);
           // Keep the selection only when nothing went up; re-sending a

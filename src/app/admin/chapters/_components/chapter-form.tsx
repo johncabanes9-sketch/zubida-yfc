@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { publicUrl } from "@/lib/images/paths";
 import { uploadTooLarge } from "@/lib/images/upload-limit";
+import { ACTION_FAILED } from "@/lib/admin/notices";
 import {
   createChapter,
   deleteChapter,
@@ -49,7 +50,13 @@ export function ChapterAdmin({
   const run = (fn: () => Promise<{ error?: string }>, okText: string, onOk?: () => void) => {
     setNotice(null);
     start(async () => {
-      const res = await fn();
+      let res: { error?: string };
+      try {
+        res = await fn();
+      } catch {
+        // A thrown action (e.g. an expired session) would otherwise be silent.
+        res = { error: ACTION_FAILED };
+      }
       if (res.error) {
         setNotice({ kind: "error", text: res.error });
         return;
