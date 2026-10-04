@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabase, loadAdminContext, requireClusterAccess } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { eventSchema } from "@/lib/validation/event";
 import type { EventRow } from "@/lib/supabase/database.types";
 import { validateImage, MAX_FILES } from "@/lib/images/validate";
@@ -16,12 +17,8 @@ function parse(formData: FormData) {
   return result.data;
 }
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log").insert({ actor_user_id: userId, action, entity: "events", entity_id: id });
-  } catch {
-    // audit is best-effort; never block the mutation on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "events", entityId: id });
 }
 
 export async function createEvent(formData: FormData) {

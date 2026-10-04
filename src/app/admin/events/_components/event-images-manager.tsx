@@ -3,7 +3,9 @@ import { fieldClass, labelClass } from "@/components/ui/field";
 import Image from "next/image";
 import { useEffect, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { deleteEventImage, reorderEventImage, uploadEventImages } from "../actions";
-import { ALLOWED_MIME, MAX_BYTES, MAX_FILES } from "@/lib/images/validate";
+import { ALLOWED_MIME, MAX_FILES } from "@/lib/images/validate";
+import { uploadTooLarge } from "@/lib/images/upload-limit";
+import { ACTION_FAILED } from "@/lib/admin/notices";
 
 export type EventImageRow = { id: string; url: string; alt: string | null };
 
@@ -36,13 +38,42 @@ export function EventImagesManager({
   function handleUpload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const formData = new FormData(form);
+    const files = new FormData(form)
+      .getAll("images")
+      .filter((f): f is File => f instanceof File && f.size > 0);
     setError(null);
+    if (files.length === 0) return setError("No files selected.");
+    if (files.length > MAX_FILES) return setError(`At most ${MAX_FILES} images per upload.`);
+    // Check every file before sending any, so a batch never half-uploads
+    // because of a size the browser could have caught.
+    const tooLarge = files.map(uploadTooLarge).find((m) => m !== null);
+    if (tooLarge) return setError(tooLarge);
+
+    // One file per request: a request is capped at 4.5MB on Vercel, so a
+    // batch sent together failed as soon as two ordinary photos were picked.
     start(async () => {
-      const res = await uploadEventImages(eventId, formData);
-      if (res.error) {
-        setError(res.error);
-        return;
+      let sent = 0;
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("images", file);
+        let res: { error?: string };
+        try {
+          res = await uploadEventImages(eventId, fd);
+        } catch {
+          // e.g. the session expired mid-batch: report it like any refusal.
+          res = { error: ACTION_FAILED };
+        }
+        if (res.error) {
+          setError(sent === 0 ? res.error : `${sent} of ${files.length} uploaded. ${res.error}`);
+          // Keep the selection only when nothing went up; re-sending a
+          // partly uploaded batch would duplicate the images already saved.
+          if (sent > 0) {
+            form.reset();
+            setPreviews([]);
+          }
+          return;
+        }
+        sent++;
       }
       form.reset();
       setPreviews([]);
@@ -72,7 +103,7 @@ export function EventImagesManager({
       <form onSubmit={handleUpload} className="grid gap-3">
         <label className="block">
           <span className={labelClass}>
-            Upload images (up to {MAX_FILES}, {MAX_BYTES / 1024 / 1024}MB max each)
+            Upload images (up to {MAX_FILES}, 4MB max each)
           </span>
           <input
             type="file"

@@ -1,0 +1,126 @@
+name: backup-verify
+
+# Proves the backup round trip against the TEST project: dump, verify,
+# encrypt with a throwaway key generated here, then decrypt and check the
+# archive is complete. Nothing is uploaded. Runs when the backup code changes.
+#
+# Needs BACKUP_VERIFY_DATABASE_URL — the TEST project's session connection
+# string, never production — and BACKUP_VERIFY_SUPABASE_URL, the TEST project
+# URL. Without them (e.g. a fork PR) the job is skipped. The TEST media bucket
+# keeps two permanent probe files under backup-probe/ for the photo round trip.
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "scripts/backup/**"
+      - ".github/workflows/backup*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_VERIFY_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.BACKUP_VERIFY_SUPABASE_URL }}
+    steps:
+      - name: Skip without the TEST connection secret
+        if: env.DATABASE_URL == ''
+        run: echo "::notice::BACKUP_VERIFY_DATABASE_URL is not set; skipping the backup round trip."
+
+      - uses: actions/checkout@v4
+        if: env.DATABASE_URL != ''
+
+      - name: Install pg_dump 17 and age
+        if: env.DATABASE_URL != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common age
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Missing inputs fail loudly
+        if: env.DATABASE_URL != ''
+        run: |
+          if AGE_RECIPIENT= bash scripts/backup/backup.sh 2>err.txt; then
+            echo "backup.sh succeeded without AGE_RECIPIENT"; exit 1
+          fi
+          grep -q "AGE_RECIPIENT is not set" err.txt
+          if DATABASE_URL= AGE_RECIPIENT=age1x bash scripts/backup/backup.sh 2>err.txt; then
+            echo "backup.sh succeeded without DATABASE_URL"; exit 1
+          fi
+          grep -q "DATABASE_URL is not set" err.txt
+          if AGE_RECIPIENT=not-a-key bash scripts/backup/backup.sh 2>err.txt; then
+            echo "backup.sh accepted a non-age recipient"; exit 1
+          fi
+          grep -q "must be an age public key" err.txt
+          if SUPABASE_URL= AGE_RECIPIENT=age1x bash scripts/backup/media.sh 2>err.txt; then
+            echo "media.sh succeeded without SUPABASE_URL"; exit 1
+          fi
+          grep -q "SUPABASE_URL is not set" err.txt
+          if SUPABASE_URL=https://evil.example.com AGE_RECIPIENT=age1x bash scripts/backup/media.sh 2>err.txt; then
+            echo "media.sh accepted a non-Supabase URL"; exit 1
+          fi
+          grep -q "must look like https://<project>.supabase.co" err.txt
+          echo "missing/invalid inputs are refused"
+
+      - name: Round trip with a throwaway key
+        if: env.DATABASE_URL != ''
+        env:
+          PG_BIN: /usr/lib/postgresql/17/bin
+        run: |
+          set -euo pipefail
+          KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"
+          age-keygen -o "$KEYDIR/key.txt" 2>/dev/null
+          export AGE_RECIPIENT="$(age-keygen -y "$KEYDIR/key.txt")"
+          OUT_DIR=out bash scripts/backup/backup.sh
+
+          files=(out/*)
+          [ "${#files[@]}" -eq 1 ] || { echo "expected exactly one output file"; exit 1; }
+          case "${files[0]}" in *.tar.gz.age) ;; *) echo "unexpected output ${files[0]}"; exit 1 ;; esac
+          if tar -tzf "${files[0]}" >/dev/null 2>&1; then echo "output is readable without the key"; exit 1; fi
+
+          mkdir restored
+          age --decrypt -i "$KEYDIR/key.txt" "${files[0]}" | tar -C restored -xzf -
+          ls restored
+          for f in public.dump auth.dump storage.dump manifest.tsv; do
+            [ -s "restored/$f" ] || { echo "missing $f"; exit 1; }
+          done
+          "$PG_BIN/pg_restore" --list restored/public.dump | grep -E "TABLE DATA public (events|event_registrations|admins|clusters) " | wc -l | grep -qx 4
+          "$PG_BIN/pg_restore" --list restored/auth.dump | grep -q "TABLE DATA auth users"
+          grep -q "^public.events	[0-9]" restored/manifest.tsv
+          # Logs of a public repo are public: report the shape, not the counts.
+          echo "manifest lists $(grep -vc '^#' restored/manifest.tsv) tables"
+          rm -rf "$KEYDIR" restored out
+
+      - name: Photo round trip with a throwaway key
+        if: env.DATABASE_URL != '' && env.SUPABASE_URL != ''
+        env:
+          PG_BIN: /usr/lib/postgresql/17/bin
+        run: |
+          set -euo pipefail
+          KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"
+          age-keygen -o "$KEYDIR/key.txt" 2>/dev/null
+          export AGE_RECIPIENT="$(age-keygen -y "$KEYDIR/key.txt")"
+          OUT_DIR=media-out bash scripts/backup/media.sh
+
+          files=(media-out/*)
+          [ "${#files[@]}" -eq 1 ] || { echo "expected exactly one output file"; exit 1; }
+          case "${files[0]}" in *zubida-media-*.tar.gz.age) ;; *) echo "unexpected output ${files[0]}"; exit 1 ;; esac
+          if tar -tzf "${files[0]}" >/dev/null 2>&1; then echo "output is readable without the key"; exit 1; fi
+
+          mkdir media-restored
+          age --decrypt -i "$KEYDIR/key.txt" "${files[0]}" | tar -C media-restored -xzf -
+          # The two permanent probes, byte-exact — one name has a space and
+          # parentheses, so URL encoding is exercised for real.
+          echo "061fe3a9f264c1f374a758f9dcd32e26067532c3b74929ffdb86a0cb96ed5d83  media-restored/media/backup-probe/probe-a.png" | sha256sum -c -
+          echo "86dd19f18f27232f241b4e124c778c868526888bee1d8f912656306622e86412  media-restored/media/backup-probe/probe b (2).png" | sha256sum -c -
+          listed="$(grep -vc '^#' media-restored/manifest.tsv)"
+          ondisk="$(find media-restored/media -type f | wc -l)"
+          [ "$listed" = "$ondisk" ] || { echo "manifest lists $listed, archive holds $ondisk"; exit 1; }
+          echo "photo archive round trip ok ($ondisk files)"
+          rm -rf "$KEYDIR" media-restored media-out

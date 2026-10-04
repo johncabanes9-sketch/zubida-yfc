@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, loadAdminContext } from "@/lib/supabase/admin-auth";
+import { recordAudit } from "@/lib/supabase/audit";
 
 export async function setStatus(
   registrationId: string,
@@ -16,11 +17,13 @@ export async function setStatus(
     .select("registration_id");
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error("Not permitted or not found");
-  await supabase.from("audit_log").insert({
-    actor_user_id: ctx.userId,
+  // Service role: audit_log has no INSERT policy, so the session client's
+  // insert was refused by RLS and every approval went unrecorded.
+  await recordAudit({
+    actorUserId: ctx.userId,
     action: `registration.${status}`,
     entity: "event_registrations",
-    entity_id: registrationId,
+    entityId: registrationId,
   });
   revalidatePath("/admin");
 }
