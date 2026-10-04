@@ -42,8 +42,9 @@ a real database, an authenticated admin surface, and a page CMS.
   handheld scanner, or type the code). A pass is admitted once, only at its own
   event; live attendance count and undo. Scoped like the event itself.
 - Registrant export — one CSV per event (Excel-ready, UTF-8), scoped like the
-  event. Spreadsheet formulas typed into the form are neutralised, the pass
-  token is never included, and every export is audited.
+  event, with who arrived and when (Manila time, QR or manual). Spreadsheet
+  formulas typed into the form are neutralised, the pass token and door
+  volunteer ids are never included, and every export is audited.
 - Site settings, user administration, event management, and an audit log.
 
 ## The content rule
@@ -95,7 +96,7 @@ M failed` and exits non-zero on any failure.
 npm run prove:content      # 142 assertions — needs no database
 npm run prove:metrics      # 14 — dashboard chart arithmetic; needs no database
 npm run prove:keepalive    # 13 — the Supabase keepalive cron; needs no database
-npm run prove:export       # 35 — registrant CSV: injection, secrets, format; no database
+npm run prove:export       # 46 — registrant CSV: injection, secrets, format; no database
 npm run prove:env          # 29 — the deploy-time configuration check; no database
 npm run prove:rbac         # 24 — role policies
 npm run prove:pages        # 22 — page CMS data layer

@@ -25,17 +25,28 @@ const manilaTime = (value: unknown): CsvValue => {
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
 };
 
+/** Derived from checked_in_at, never stored, so it cannot disagree with it. */
+const arrived = (value: unknown): CsvValue => value !== null && value !== undefined;
+
+const CHECK_IN_METHOD: Record<string, string> = { qr: "QR", manual: "Manual" };
+const checkInMethod = (value: unknown): CsvValue =>
+  typeof value === "string" ? CHECK_IN_METHOD[value] ?? value : null;
+
 /**
  * What an organizer plans an event with. Deliberately NOT here:
  * - qr_token — it is the pass's secret; anyone holding it can present the
  *   pass and open the status page. A spreadsheet gets forwarded.
- * - internal ids (id, event_id) and bookkeeping (updated_at, deleted_at).
+ * - internal ids (id, event_id, checked_in_by) and bookkeeping (updated_at,
+ *   deleted_at). checked_in_by is the door volunteer's auth user id.
  * The route selects exactly these keys (REGISTRANT_SELECT), so an omitted
  * column never even leaves the database.
  */
 export const REGISTRANT_COLUMNS: readonly Column[] = [
   { key: "registration_id", header: "Registration code" },
   { key: "status", header: "Status" },
+  { key: "checked_in_at", header: "Arrived", format: arrived },
+  { key: "checked_in_at", header: "Checked in at (Manila)", format: manilaTime },
+  { key: "check_in_method", header: "Check-in method", format: checkInMethod },
   { key: "created_at", header: "Registered at (Manila)", format: manilaTime },
   { key: "full_name", header: "Full name" },
   { key: "nickname", header: "Nickname" },
@@ -57,7 +68,8 @@ export const REGISTRANT_COLUMNS: readonly Column[] = [
   { key: "consent", header: "Consent given" },
 ];
 
-export const REGISTRANT_SELECT = REGISTRANT_COLUMNS.map((c) => c.key).join(", ");
+// Deduplicated: Arrived and the check-in time both read checked_in_at.
+export const REGISTRANT_SELECT = [...new Set(REGISTRANT_COLUMNS.map((c) => c.key))].join(", ");
 
 export function registrantsCsv(rows: readonly Registrant[]): string {
   return toCsv(
