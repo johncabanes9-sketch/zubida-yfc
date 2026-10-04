@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePYH, createServerSupabase } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { validateImage } from "@/lib/images/validate";
 import { testimonialPhotoKey } from "@/lib/testimonials/paths";
 import { testimonialSchema } from "@/lib/validation/testimonial";
@@ -16,13 +17,8 @@ const optional = (v: string | undefined) => {
   return s.length > 0 ? s : null;
 };
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log")
-      .insert({ actor_user_id: userId, action, entity: "testimonials", entity_id: id });
-  } catch {
-    // best-effort; never block the mutation on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "testimonials", entityId: id });
 }
 
 function revalidate() {
