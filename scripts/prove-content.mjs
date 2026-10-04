@@ -200,13 +200,11 @@ check(
   /posts\.length\s*>\s*0\s*&&\s*<NewsPreview/.test(home),
   null,
 );
-for (const section of ["Testimonials"]) {
-  check(
-    `homepage renders <${section}/> only when its content is verified`,
-    new RegExp(`isVerified\\([^)]*\\)\\s*&&\\s*<${section}`).test(home),
-    null,
-  );
-}
+check(
+  "homepage renders <Testimonials/> only when published testimonials exist",
+  /testimonials\.length\s*>\s*0\s*&&\s*<Testimonials/.test(home),
+  null,
+);
 check(
   "hero photography is gated",
   /showPhotos\s*&&/.test(hero) && hero.includes("isVerified"),
@@ -216,7 +214,7 @@ check(
 // ── 4. Fixture gates stay shut until content is confirmed ──────────────────
 // These flip only when an administrator supplies verified content — and the
 // domain should move to a managed table at that point, not stay a fixture.
-for (const domain of ["testimonials", "aboutHistory", "photography"]) {
+for (const domain of ["aboutHistory", "photography"]) {
   check(`fixture domain "${domain}" is not published as fact`, isVerified(domain) === false, domain);
 }
 
@@ -277,6 +275,11 @@ const statsBand = read("src/components/home/stats-band.tsx");
 check(
   "stats band reads from the database, not from src/data/stats.ts",
   statsBand.includes("getSiteStats") && !statsBand.includes('from "@/data/stats"'),
+  null,
+);
+check(
+  "the invented stats figures are gone from src/data/stats.ts",
+  !/export const stats\b/.test(read("src/data/stats.ts")),
   null,
 );
 const statsLib = code("src/lib/data/stats.ts");
