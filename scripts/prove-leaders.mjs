@@ -661,6 +661,52 @@ try {
     looseWrites.length === leaderWrites.length,
     { strict: leaderWrites.length, loose: looseWrites.length });
 
+  console.log("\n── Admin form wiring (source-level) ──");
+
+  // The photo and withdrawal actions above are only worth proving if an admin
+  // can reach them. They shipped unreferenced by any component, so every guard
+  // in this file protected code nothing could call.
+  const form = readFileSync(join(root, "src/app/admin/leaders/_components/leader-form.tsx"), "utf8");
+  const page = readFileSync(join(root, "src/app/admin/leaders/page.tsx"), "utf8");
+  for (const fn of ["uploadLeaderPhoto", "removeLeaderPhoto", "withdrawConsent"]) {
+    check(`the leader form calls ${fn}`, new RegExp(`${fn}\\(`).test(form), null);
+  }
+  // The server reads formData.get("photo"); any other field name reaches it as
+  // "No file selected." with the admin's file silently dropped.
+  check("the photo upload sends the file under the field the server reads",
+    /\.append\("photo",/.test(form), null);
+  // A photo is personal content: the upload stays disabled until the admin
+  // ticks the consent box, the same gate the quote has.
+  // Anchored on the file input itself, so a disabled Remove button elsewhere
+  // cannot satisfy it.
+  check("the photo upload is disabled until consent is ticked",
+    /type="file"[^>]*?disabled=\{[^}]*!photoConsent[^}]*\}/.test(form), null);
+  // The functions above can exist and still never be mounted -- the exact
+  // failure this block exists for. Both must render inside the editor.
+  const editor = form.slice(form.indexOf("{editingId === l.id && ("), form.indexOf("function LeaderFields"));
+  for (const c of ["PhotoField", "ConsentField"]) {
+    check(`the leader editor renders <${c}>`, new RegExp(`<${c}\\b`).test(editor), null);
+  }
+  // An oversized body never reaches the action (and hangs in dev), so the
+  // size is refused before uploadLeaderPhoto is ever called.
+  check("an oversized photo is refused before it is sent",
+    /file\.size > MAX_PHOTO_BYTES[\s\S]{0,300}return;[\s\S]{0,400}uploadLeaderPhoto\(/.test(form), null);
+  // Server actions default to a 1MB body; validateImage allows 5MB.
+  const nextConfig = readFileSync(join(root, "next.config.mjs"), "utf8");
+  const limit = nextConfig.match(/bodySizeLimit:\s*"(\d+)mb"/);
+  check("server actions accept a photo as large as validateImage allows",
+    !!limit && Number(limit[1]) > 5, limit?.[0] ?? null);
+  check("removing a photo asks first",
+    /confirm\([^)]*\)\)\s*return;\s*\n\s*onRun\(\(\) => removeLeaderPhoto/.test(form), null);
+  check("withdrawing consent asks first",
+    /confirm\([^)]*\)\)\s*return;\s*\n\s*onRun\(\(\) => withdrawConsent/.test(form), null);
+  // Withdrawal is offered only when there is something to withdraw; the
+  // button otherwise reports success for a no-op.
+  check("withdrawal is offered only while consent is on record",
+    /leader\.consent_at\s*(\?|&&)[\s\S]{0,1200}withdrawConsent\(/.test(form), null);
+  check("the admin page loads photo_path and consent_at for the form",
+    /\.select\(\s*"[^"]*photo_path[^"]*"/.test(page) && /\.select\(\s*"[^"]*consent_at[^"]*"/.test(page), null);
+
 } catch (e) {
   crashed = e;
 } finally {

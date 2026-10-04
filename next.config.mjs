@@ -15,6 +15,13 @@ const supabaseHostname = (() => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Server actions default to a 1MB request body, but validateImage accepts
+    // photos up to 5MB (MAX_BYTES); a typical phone photo between the two was
+    // rejected before reaching the action. 5MB of image plus multipart
+    // overhead. Vercel's own 4.5MB function body cap still applies in prod.
+    serverActions: { bodySizeLimit: "6mb" },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "picsum.photos" },

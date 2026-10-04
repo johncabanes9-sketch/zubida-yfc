@@ -41,3 +41,5 @@ jobs:
       - run: npm run prove:keepalive
       - run: npm run prove:export
       - run: npm run prove:env
+      - run: npm run prove:audit
+      - run: npm run prove:upload-limits

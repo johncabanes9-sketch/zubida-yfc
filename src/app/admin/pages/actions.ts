@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requirePYH } from "@/lib/supabase/admin-auth";
 import { createServerSupabase } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { parseSectionContent } from "@/lib/pages/content-schemas";
 import { REGISTRY } from "@/lib/pages/registry";
 import { validateImage } from "@/lib/images/validate";
@@ -11,12 +12,8 @@ import { collectImagePaths, reapPaths } from "@/lib/pages/reap";
 import { publicUrl } from "@/lib/images/paths";
 import type { PageRow, PageSectionRow } from "@/lib/supabase/database.types";
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log").insert({ actor_user_id: userId, action, entity: "pages", entity_id: id });
-  } catch {
-    // best-effort; never block the mutation on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "pages", entityId: id });
 }
 
 async function slugFor(pageId: string): Promise<string> {

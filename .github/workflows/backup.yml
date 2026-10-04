@@ -1,0 +1,89 @@
+name: backup
+
+# Nightly encrypted backups of the database and of the uploaded photos.
+# Supabase's free tier keeps no point-in-time recovery, so these are the
+# only copies outside Supabase.
+#
+# Needs three repository secrets (see docs/BACKUPS.md):
+#   BACKUP_DATABASE_URL   production session connection string (port 5432)
+#   BACKUP_SUPABASE_URL   https://<project>.supabase.co (photos job)
+#   BACKUP_AGE_RECIPIENT  your age PUBLIC key (age1...)
+# Without them the run fails — deliberately red, never a silent green.
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 02:00 Asia/Manila
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pg_dump 17 and age
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common age
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump, verify and encrypt
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+          PG_BIN: /usr/lib/postgresql/17/bin
+          OUT_DIR: backup-out
+        run: bash scripts/backup/backup.sh
+
+      # Only the .age file is uploaded; the script never leaves plaintext in
+      # backup-out. Artifacts of a public repo are downloadable by any signed-in
+      # GitHub user, which is exactly why the encryption is not optional.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zubida-db-${{ github.run_id }}
+          path: backup-out/*.age
+          retention-days: 30
+          if-no-files-found: error
+
+  # The image files themselves (the database backup only lists them). The
+  # bucket is public-read, so files are fetched by public URL — no
+  # service-role key in CI.
+  media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql 17 and age
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common age
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Download, verify and encrypt photos
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+          PG_BIN: /usr/lib/postgresql/17/bin
+          OUT_DIR: backup-out
+        run: bash scripts/backup/media.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zubida-media-${{ github.run_id }}
+          path: backup-out/*.age
+          retention-days: 30
+          if-no-files-found: error
+          # Already compressed and encrypted; zipping it again wastes time.
+          compression-level: 0
