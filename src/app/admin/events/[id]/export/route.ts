@@ -6,6 +6,7 @@ import {
   createServerSupabase,
 } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { registrantsCsv, exportFilename, REGISTRANT_SELECT } from "@/lib/export/registrants";
 
 export const runtime = "nodejs";
@@ -52,17 +53,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Personal data leaving the system: record who took it and how much.
-  try {
-    await createServiceClient().from("audit_log").insert({
-      actor_user_id: ctx.userId,
-      action: "registrations.export",
-      entity: "events",
-      entity_id: id,
-      meta: { rows: rows.length },
-    });
-  } catch {
-    // best-effort; never block the export on logging failure
-  }
+  await recordAudit({
+    actorUserId: ctx.userId,
+    action: "registrations.export",
+    entity: "events",
+    entityId: id,
+    meta: { rows: rows.length },
+  });
 
   return new NextResponse(registrantsCsv(rows), {
     headers: {

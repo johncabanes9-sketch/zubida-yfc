@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireClusterAccess, createServerSupabase, loadAdminContext } from "@/lib/supabase/admin-auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { recordAudit } from "@/lib/supabase/audit";
 import { validateImage } from "@/lib/images/validate";
 import { chapterImageKey } from "@/lib/chapters/paths";
 import { reapPaths } from "@/lib/pages/reap";
@@ -26,13 +27,8 @@ const optional = (v: FormDataEntryValue | null) => {
   return s.length > 0 ? s : null;
 };
 
-async function audit(userId: string, action: string, id: string) {
-  try {
-    await createServiceClient().from("audit_log")
-      .insert({ actor_user_id: userId, action, entity: "chapters", entity_id: id });
-  } catch {
-    // best-effort; never block the mutation on logging failure
-  }
+function audit(userId: string, action: string, id: string) {
+  return recordAudit({ actorUserId: userId, action, entity: "chapters", entityId: id });
 }
 
 export async function createChapter(formData: FormData): Promise<{ error?: string }> {

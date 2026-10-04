@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { publicUrl } from "@/lib/images/paths";
+import { uploadTooLarge } from "@/lib/images/upload-limit";
 import {
   createChapter,
   deleteChapter,
@@ -200,7 +201,15 @@ function ChapterFields({
   onRun?: (fn: () => Promise<{ error?: string }>, okText: string) => void;
 }) {
   return (
-    <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
+    // onSubmit, not <form action>: React 19 resets an action form as soon as
+    // the action returns, so a refused save would wipe what was typed.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(new FormData(e.currentTarget));
+      }}
+      className="grid max-w-xl gap-4"
+    >
       <label className="block">
         <span className={labelClass}>Name</span>
         <input name="name" required defaultValue={chapter?.name} className={fieldClass} />
@@ -326,14 +335,19 @@ function CoverField({
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            if (inputRef.current) inputRef.current.value = "";
+            const tooLarge = uploadTooLarge(file);
+            if (tooLarge) {
+              onRun(async () => ({ error: tooLarge }), "");
+              return;
+            }
             const fd = new FormData();
             fd.append("cover", file);
             onRun(() => uploadChapterCover(chapterId, fd), "Cover image uploaded.");
-            if (inputRef.current) inputRef.current.value = "";
           }}
         />
         <p className="mt-1 text-xs text-muted">
-          Uploading replaces the current cover and deletes the old file.
+          JPEG, PNG or WebP, up to 4MB. Uploading replaces the current cover and deletes the old file.
         </p>
       </div>
     </div>

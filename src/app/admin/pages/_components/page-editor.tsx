@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ChevronDown, Eye, EyeOff, MoveDown, MoveUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { EditorField } from "@/lib/pages/registry";
+import { uploadTooLarge } from "@/lib/images/upload-limit";
 import {
   addSection,
   deleteSection,
@@ -73,9 +74,12 @@ export function PageEditor({
       )}
 
       {/* ── SEO ── */}
+      {/* onSubmit, not <form action>: React 19 resets an action form as soon
+          as the action returns, so a refused save would wipe the fields. */}
       <form
-        action={async (formData: FormData) => {
-          const res = await updatePageSeo(pageId, formData);
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const res = await updatePageSeo(pageId, new FormData(e.currentTarget));
           setNotice(
             res.error ? { kind: "error", text: res.error } : { kind: "ok", text: "SEO saved." },
           );
@@ -514,14 +518,19 @@ function ImageField({
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            if (inputRef.current) inputRef.current.value = "";
+            const tooLarge = uploadTooLarge(file);
+            if (tooLarge) {
+              onRun(async () => ({ error: tooLarge }), "");
+              return;
+            }
             const fd = new FormData();
             fd.append("image", file);
             onRun(() => uploadSectionImage(sectionId, fieldKey, fd), "Image uploaded.");
-            if (inputRef.current) inputRef.current.value = "";
           }}
         />
         <p className="mt-1 text-xs text-muted">
-          Uploading replaces the current image and deletes the old file.
+          JPEG, PNG or WebP, up to 4MB. Uploading replaces the current image and deletes the old file.
         </p>
       </div>
     </div>
