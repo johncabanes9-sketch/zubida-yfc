@@ -1,10 +1,29 @@
 "use client";
 import { fieldClass, labelClass } from "@/components/ui/field";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createLeader, deleteLeader, updateLeader } from "../actions";
+import { publicUrl } from "@/lib/images/paths";
+import {
+  createLeader,
+  deleteLeader,
+  removeLeaderPhoto,
+  updateLeader,
+  uploadLeaderPhoto,
+  withdrawConsent,
+} from "../actions";
+
+/**
+ * Largest photo the editor will send. Below validateImage's 5MB because the
+ * request has to fit Vercel's 4.5MB function body cap with multipart overhead;
+ * a larger body never reaches the action, and the dev server leaves the
+ * request hanging instead of failing. Checked before anything is sent.
+ */
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+
+type RunAction = (fn: () => Promise<{ error?: string }>, okText: string, onOk?: () => void) => void;
 
 export type LeaderListItem = {
   id: string;
@@ -16,6 +35,8 @@ export type LeaderListItem = {
   facebook_url: string | null;
   instagram_url: string | null;
   is_published: boolean;
+  photo_path: string | null;
+  consent_at: string | null;
   chapter_name: string | null;
   cluster_name: string | null;
 };
@@ -39,10 +60,19 @@ export function LeaderAdmin({
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
   /** Runs a server action and surfaces its error instead of failing silently. */
-  const run = (fn: () => Promise<{ error?: string }>, okText: string, onOk?: () => void) => {
+  const run: RunAction = (fn, okText, onOk) => {
     setNotice(null);
     start(async () => {
-      const res = await fn();
+      // A server action can reject rather than return { error } — most often a
+      // photo over the request body limit, which never reaches the action at
+      // all. Without this the rejection escapes to the error boundary and the
+      // admin sees the whole page fail instead of a notice.
+      let res: { error?: string };
+      try {
+        res = await fn();
+      } catch {
+        res = { error: "That did not go through. If you were uploading a photo, try a smaller file." };
+      }
       if (res.error) {
         setNotice({ kind: "error", text: res.error });
         return;
@@ -173,6 +203,8 @@ export function LeaderAdmin({
                       run(() => updateLeader(l.id, formData), "Leader saved.", () => setEditingId(null))
                     }
                   />
+                  <PhotoField leader={l} pending={pending} onRun={run} />
+                  <ConsentField leader={l} pending={pending} onRun={run} onWithdrawn={() => setEditingId(null)} />
                 </div>
               )}
             </div>
@@ -201,15 +233,23 @@ function LeaderFields({
   onSubmit: (formData: FormData) => void;
 }) {
   // The consent checkbox is a required client-side gate, shown only while
-  // there is personal content to gate: a quote (a photo is added in a later
-  // slice). It records nothing itself — the server captures consent_at /
+  // there is personal content to gate: a quote (PhotoField gates the photo the
+  // same way). It records nothing itself — the server captures consent_at /
   // consent_by the moment a non-blank message is submitted — but it forces the
   // admin to see and accept what that means before the form will submit.
   const [message, setMessage] = useState(leader?.message ?? "");
   const needsConsent = message.trim().length > 0;
 
   return (
-    <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
+    // onSubmit, not <form action>: React 19 resets an action form as soon as
+    // the action returns, so a refused save would wipe what was typed.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(new FormData(e.currentTarget));
+      }}
+      className="grid max-w-xl gap-4"
+    >
       <label className="block">
         <span className={labelClass}>Name</span>
         <input name="name" required defaultValue={leader?.name} className={fieldClass} />
@@ -285,5 +325,142 @@ function LeaderFields({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Photo control for an existing leader. Follows CoverField in chapter-form.tsx:
+ * uploading replaces the current photo and reaps the old object; removing
+ * deletes the object before clearing the reference. Unlike a chapter cover, a
+ * photo of a person is personal content, so the file input stays disabled
+ * until the admin confirms consent — the server stamps consent_at/consent_by
+ * in the same statement that sets photo_path.
+ */
+function PhotoField({ leader, pending, onRun }: { leader: LeaderListItem; pending: boolean; onRun: RunAction }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const src = leader.photo_path ? publicUrl(leader.photo_path) : null;
+
+  return (
+    <div className="mt-5 max-w-xl rounded-xl border border-black/10 p-4 dark:border-white/10">
+      <h3 className={labelClass}>Photo</h3>
+
+      {src ? (
+        <div className="mt-3 grid gap-3">
+          <div className="relative h-40 w-32 overflow-hidden rounded-lg">
+            <Image src={src} alt={`Photo of ${leader.name}`} fill sizes="128px" className="object-cover" />
+          </div>
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm(`Remove ${leader.name}'s photo? The uploaded file is deleted too.`)) return;
+                onRun(() => removeLeaderPhoto(leader.id), "Photo removed.");
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Remove photo
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted">
+          No photo. The public card renders without one — never a stand-in face.
+        </p>
+      )}
+
+      <label className="mt-4 flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          id={`photo-consent-${leader.id}`}
+          className="mt-0.5"
+          checked={photoConsent}
+          onChange={(e) => setPhotoConsent(e.target.checked)}
+        />
+        <span id={`photo-consent-${leader.id}-hint`}>
+          I have recorded this person&apos;s consent to publish this photo of them.
+        </span>
+      </label>
+
+      <div className="mt-3">
+        <input
+          ref={inputRef}
+          type="file"
+          aria-label={src ? "Replace photo" : "Upload photo"}
+          aria-describedby={`photo-consent-${leader.id}-hint`}
+          accept="image/jpeg,image/png,image/webp"
+          className="block w-full min-w-0 text-sm disabled:opacity-50"
+          disabled={pending || !photoConsent}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            if (inputRef.current) inputRef.current.value = "";
+            if (file.size > MAX_PHOTO_BYTES) {
+              onRun(async () => ({ error: "That photo is over 4MB. Resize or compress it, then upload again." }), "");
+              return;
+            }
+            const fd = new FormData();
+            fd.append("photo", file);
+            // Consent resets only once the photo it covered is saved; a failed
+            // upload leaves it ticked for the retry.
+            onRun(() => uploadLeaderPhoto(leader.id, fd), "Photo uploaded.", () => setPhotoConsent(false));
+          }}
+        />
+        <p className="mt-1 text-xs text-muted">
+          JPEG, PNG or WebP, up to 4MB. Uploading replaces the current photo and deletes the old file.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Withdrawal of consent: deletes the photo file and clears the photo, the
+ * quote and the consent record in one step. Offered only while consent is on
+ * record — with nothing published under it there is nothing to withdraw. The
+ * editor closes afterwards so its quote field, still holding the withdrawn
+ * text, cannot be saved straight back.
+ */
+function ConsentField({
+  leader,
+  pending,
+  onRun,
+  onWithdrawn,
+}: {
+  leader: LeaderListItem;
+  pending: boolean;
+  onRun: RunAction;
+  onWithdrawn: () => void;
+}) {
+  return (
+    <div className="mt-5 max-w-xl rounded-xl border border-black/10 p-4 dark:border-white/10">
+      <h3 className={labelClass}>Consent</h3>
+      {leader.consent_at ? (
+        <div className="mt-2 grid gap-3">
+          <p className="text-sm text-muted">
+            Consent recorded {new Date(leader.consent_at).toLocaleDateString("en-PH", { dateStyle: "medium" })}{" "}
+            for {[leader.photo_path && "the photo", leader.message !== null && "the quote"].filter(Boolean).join(" and ")}.
+          </p>
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm(`Withdraw ${leader.name}'s consent? Their photo is deleted and their quote cleared.`)) return;
+                onRun(() => withdrawConsent(leader.id), "Consent withdrawn. Photo and quote removed.", onWithdrawn);
+              }}
+            >
+              <span className="text-rose-700 dark:text-rose-300">Withdraw consent</span>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-muted">No photo or quote is published, so no consent is on record.</p>
+      )}
+    </div>
   );
 }
