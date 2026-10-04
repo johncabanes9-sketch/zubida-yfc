@@ -33,9 +33,8 @@ a real database, an authenticated admin surface, and a page CMS.
   provincial youth head manages all. Entered as drafts and published per row.
 - Leadership directory — cluster heads manage their own cluster's leaders, the
   provincial youth head manages all. A photo or a personal quote cannot be stored
-  without a recorded consent basis. Photo upload and consent withdrawal exist as
-  server actions but are not yet wired into the admin form; that is the next
-  slice.
+  without a recorded consent basis. The admin form uploads, replaces and removes
+  the photo (up to 4MB), and withdrawing consent clears the photo and quote.
 - Messages inbox — what the public contact form sends, readable by the provincial
   youth head only. Messages are triaged (new / read / archived), never edited or
   deleted.

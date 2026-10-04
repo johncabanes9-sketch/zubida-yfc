@@ -241,7 +241,15 @@ function LeaderFields({
   const needsConsent = message.trim().length > 0;
 
   return (
-    <form action={(formData: FormData) => onSubmit(formData)} className="grid max-w-xl gap-4">
+    // onSubmit, not <form action>: React 19 resets an action form as soon as
+    // the action returns, so a refused save would wipe what was typed.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(new FormData(e.currentTarget));
+      }}
+      className="grid max-w-xl gap-4"
+    >
       <label className="block">
         <span className={labelClass}>Name</span>
         <input name="name" required defaultValue={leader?.name} className={fieldClass} />
