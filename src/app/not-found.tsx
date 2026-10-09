@@ -3,7 +3,7 @@ import { ButtonLink } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <section className="relative flex min-h-[80svh] items-center justify-center overflow-hidden bg-midnight-950 text-center text-cream">
+    <section data-nav-over="dark" className="relative flex min-h-[80svh] items-center justify-center overflow-hidden bg-midnight-950 text-center text-cream">
       <div className="pointer-events-none absolute inset-0 bg-radiant opacity-60" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-gold-400/10">
         <Sunburst className="h-[26rem] w-[26rem] motion-safe:animate-spin-slow" rays={24} />

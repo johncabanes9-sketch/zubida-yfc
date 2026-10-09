@@ -135,11 +135,9 @@ export function Footer({
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-cream/50 sm:flex-row sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} {fullName}. All rights reserved.</p>
           <p>{closingLine}</p>
-          {/* The only route into /admin/login from the site itself. It belongs
-              here and not in the primary nav: the leaders who need it are a
-              handful, and a login form beside "Events" invites everyone else to
-              try it. py-1.5 is not decoration — it lifts a 16px line box over
-              the 24px target-size floor prove:a11y enforces. */}
+          {/* A second, quieter way in to /admin/login beside the navbar's
+              "Log in". py-1.5 is not decoration — it lifts a 16px line box
+              over the 24px target-size floor prove:a11y enforces. */}
           <Link
             href="/admin/login"
             prefetch={false}

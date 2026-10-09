@@ -30,7 +30,8 @@
     "prove:env": "node scripts/prove-env.mjs",
     "prove:gallery": "node --conditions=react-server --experimental-strip-types scripts/prove-gallery.mjs",
     "prove:news": "node --conditions=react-server --experimental-strip-types scripts/prove-news.mjs",
-    "prove:testimonials": "node --conditions=react-server --experimental-strip-types scripts/prove-testimonials.mjs"
+    "prove:testimonials": "node --conditions=react-server --experimental-strip-types scripts/prove-testimonials.mjs",
+    "prove:login": "node scripts/prove-login.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
