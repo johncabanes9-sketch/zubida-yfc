@@ -106,6 +106,40 @@ body {
 .rule { border-color: var(--rule); }
 .rule-strong { border-color: var(--rule-strong); }
 
+/* Navbar tokens. Once scrolled, the bar is a `.glass` strip over page
+   content and follows the theme. At the very top it is transparent, and every
+   public page opens on a navy header (home hero, PageHeader, 404) marked
+   data-nav-over="dark" — so there the controls must read as on-dark in BOTH
+   themes. Light-mode slate links and a royal focus ring vanish on navy.
+   Only a marked header that is <main>'s FIRST child counts: the About page is
+   CMS-ordered, and a hero moved further down must not flip the bar.
+   Pure CSS (:has) so the right colours paint on first frame, no JS flash. */
+.site-nav {
+  --nav-link: var(--muted);
+  --nav-link-hover: var(--fg);
+  --nav-active: #1E40AF;
+  --nav-active-bg: rgba(30, 64, 175, 0.10);
+  --nav-control: var(--fg);
+  --nav-control-border: rgba(18, 34, 78, 0.14);
+  --nav-control-hover: rgba(18, 34, 78, 0.06);
+}
+.dark .site-nav {
+  --nav-active: #FCD980;
+  --nav-active-bg: rgba(248, 201, 92, 0.15);
+  --nav-control-border: rgba(255, 255, 255, 0.15);
+  --nav-control-hover: rgba(255, 255, 255, 0.10);
+}
+body:has(main > [data-nav-over="dark"]:first-child) .site-nav[data-at-top="true"] {
+  --nav-link: rgba(251, 248, 241, 0.85);
+  --nav-link-hover: #FFFFFF;
+  --nav-active: #FCD980;
+  --nav-active-bg: rgba(248, 201, 92, 0.15);
+  --nav-control: #FBF8F1;
+  --nav-control-border: rgba(255, 255, 255, 0.24);
+  --nav-control-hover: rgba(255, 255, 255, 0.10);
+  --ring: #F8C95C;
+}
+
 /* Gradient text */
 .text-dawn {
   background: linear-gradient(120deg, #1E40AF 0%, #3B6FE0 40%, #E09E1F 100%);

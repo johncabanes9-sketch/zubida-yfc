@@ -32,6 +32,45 @@ const check = (n, c, got) =>
     ? (pass++, console.log(`  PASS  ${n}`))
     : (fail++, console.log(`  FAIL  ${n}  got=${JSON.stringify(got)}`));
 
+/** "rgb(r, g, b)" / "rgba(r, g, b, a)" -> [r, g, b]. Alpha is ignored: the
+ *  colours measured here are opaque or near enough that it can't flip a 3:1. */
+const parseRgb = (css) => (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+const luminance = ([r, g, b]) => {
+  const lin = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+/** The real painted background behind each sampled element: hide its ink,
+ *  screenshot just its box, average the pixels in an in-page canvas. This sees
+ *  gradients, overlays and stacking bugs that computed styles cannot. */
+async function sampleBehind(page, samples) {
+  const out = {};
+  for (const [key, s] of Object.entries(samples)) {
+    if (!s || typeof s !== "object" || !s.box?.w) continue;
+    const sel = key === "h1" ? "main h1" : 'header button[aria-label^="Switch to"]';
+    await page.addStyleTag({ content: `${sel}, ${sel} * { color: transparent !important; -webkit-text-fill-color: transparent !important; }` });
+    const png = await page.screenshot({ clip: { x: s.box.x, y: s.box.y, width: s.box.w, height: s.box.h } });
+    await page.evaluate(() => document.head.lastElementChild?.remove());
+    out[key] = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${b64}`;
+      await img.decode();
+      const c = Object.assign(document.createElement("canvas"), { width: img.width, height: img.height });
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      const sum = [0, 0, 0];
+      for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) sum[k] += d[i + k];
+      return sum.map((v) => Math.round(v / (d.length / 4)));
+    }, png.toString("base64"));
+  }
+  return out;
+}
+
 // Reuse whatever is already answering on BASE_URL; only spawn when nothing is.
 async function answering() {
   try {
@@ -168,37 +207,80 @@ try {
     await ctx.close();
   }
 
-  // The admins here are youth volunteers, not people who keep a bookmark for a
-  // URL nobody links. /admin/login has always been reachable by typing it and
-  // by nothing else, so losing the URL meant losing the way in. The link sits
-  // in the footer and not the primary nav on purpose: it serves the handful of
-  // leaders who need it without putting a login form in front of every visitor.
-  // Its size is already governed by the target-size assertion above, which
-  // audits "/" and therefore audits the footer.
+  // Officers and admins are youth volunteers, not people who keep a bookmark,
+  // so the way in to /admin/login is a visible "Log in" in the navbar (a pill
+  // at lg+, an item in the menu below that), with the footer link as a quieter
+  // second door. Their size is governed by the target-size assertion above.
   {
-    const ctx = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      hasTouch: true,
-    });
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 } });
     const page = await ctx.newPage();
     page.setDefaultTimeout(60_000);
     await page.goto(BASE_URL + "/", { waitUntil: "networkidle", timeout: 90_000 });
-
-    const entry = await page.evaluate(() => {
-      const el = document.querySelector('footer a[href="/admin/login"]');
+    const desk = await page.evaluate(() => {
+      const el = document.querySelector('header a[href="/admin/login"]');
       return {
         found: el !== null,
-        name: el ? (el.textContent || el.getAttribute("aria-label") || "").trim() : null,
-        inNav: document.querySelector('header a[href="/admin/login"]') !== null,
+        shown: el ? el.getBoundingClientRect().width > 0 : false,
+        name: el ? (el.getAttribute("aria-label") || el.textContent || "").trim() : null,
+        footer: document.querySelector('footer a[href="/admin/login"]') !== null,
       };
     });
+    check("desktop navbar shows a Log in link to admin sign-in", desk.found && desk.shown, desk);
+    check("its accessible name starts with its visible text (label-in-name)", /^Log in/.test(desk.name ?? ""), desk);
+    check("the footer still offers a way in to admin sign-in", desk.footer, desk);
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(60_000);
+    await page.goto(BASE_URL + "/", { waitUntil: "networkidle", timeout: 90_000 });
+    const hiddenBefore = await page.evaluate(() =>
+      [...document.querySelectorAll('header a[href="/admin/login"]')].every((el) => el.getBoundingClientRect().width === 0),
+    );
+    await page.getByRole("button", { name: "Toggle menu" }).click();
+    const inMenu = page.locator('#mobile-menu a[href="/admin/login"]');
+    await inMenu.waitFor({ state: "visible" });
+    check("on a phone the Log in link waits inside the menu", hiddenBefore && (await inMenu.isVisible()), { hiddenBefore });
+    await ctx.close();
+  }
 
-    check("the footer offers a way in to admin sign-in", entry.found, entry);
-    check("that way in carries an accessible name", Boolean(entry.name), entry);
-    // A nav_links row would put it here as well as in the footer's Explore
-    // column — the wrong mechanism for a link meant to stay discreet.
-    check("the primary nav does not advertise admin sign-in", !entry.inNav, entry);
-
+  // Light mode over the navy headers. The home hero's overlays once painted
+  // behind an ancestor's cream background (no stacking context), leaving white
+  // copy on cream; and the transparent navbar kept light-mode slate controls
+  // over navy. axe can't see either — it gives up on gradient and overlapped
+  // backgrounds — so measure the real pixels behind the text instead.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, colorScheme: "light" });
+    await ctx.addInitScript(() => {
+      try { localStorage.setItem("zubida-theme", "light"); } catch {}
+    });
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(60_000);
+    for (const path of ["/", "/about"]) {
+      await page.goto(BASE_URL + path, { waitUntil: "networkidle", timeout: 90_000 });
+      await page.waitForTimeout(1500);
+      const samples = await page.evaluate(() => {
+        const rect = (el) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height };
+        };
+        const fg = (el) => getComputedStyle(el).color;
+        const h1 = document.querySelector("main h1");
+        const toggle = document.querySelector('header button[aria-label^="Switch to"]');
+        return {
+          h1: h1 && { color: fg(h1), box: rect(h1) },
+          toggle: toggle && { color: fg(toggle), box: rect(toggle) },
+          atTop: document.querySelector("header")?.getAttribute("data-at-top"),
+        };
+      });
+      const bg = await sampleBehind(page, samples);
+      for (const key of ["h1", "toggle"]) {
+        const ratio = bg[key] && samples[key] ? contrast(parseRgb(samples[key].color), bg[key]) : 0;
+        const floor = 3; // large text (1.4.3) and UI components (1.4.11)
+        check(`light mode ${path}: ${key} clears ${floor}:1 over the header`, ratio >= floor, { ratio: +ratio.toFixed(2), color: samples[key]?.color, bg: bg[key] });
+      }
+    }
     await ctx.close();
   }
 } finally {

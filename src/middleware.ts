@@ -59,6 +59,17 @@ export async function middleware(request: NextRequest) {
   });
 
   if (isLogin) {
+    // /admin refused this account (no admins row, or deactivated) and sent it
+    // here. Bouncing a signed-in user back to /admin would loop forever, so
+    // end the session and let the page show the refusal — which also frees
+    // the form for a different account. Local scope: anyone can link here,
+    // so this must only end the session in this browser, never revoke the
+    // account's sessions on every device.
+    if (request.nextUrl.searchParams.get("error") === "not-admin") {
+      await supabase.auth.signOut({ scope: "local" });
+      response.cookies.set("last_activity", "", { maxAge: 0, path: "/" });
+      return response;
+    }
     return redirectTo("/admin");
   }
   return response;

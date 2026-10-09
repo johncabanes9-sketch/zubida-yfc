@@ -34,7 +34,14 @@ export function Hero({
   }, []);
 
   return (
-    <section className="relative flex min-h-[100svh] items-center overflow-hidden">
+    // `isolate` gives the -z overlays below a stacking context of their own.
+    // Without it they painted behind an ancestor's cream background, so in
+    // light mode the white and gold copy sat on cream. bg-midnight-950 is the
+    // floor if the overlays ever fail to paint at all.
+    <section
+      data-nav-over="dark"
+      className="relative isolate flex min-h-[100svh] items-center overflow-hidden bg-midnight-950"
+    >
       {/* Slideshow */}
       {showPhotos && (
         <div className="absolute inset-0 -z-20">
@@ -79,7 +86,7 @@ export function Hero({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="glass mb-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-gold-300"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 backdrop-blur-md text-xs font-semibold uppercase tracking-[0.2em] text-gold-300"
           >
             <Sparkles className="h-4 w-4" />
             {province} · Youth for Christ
@@ -118,7 +125,7 @@ export function Hero({
             <ButtonLink
               href="/events"
               size="lg"
-              className="glass text-white hover:bg-white/10"
+              className="border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
             >
               <CalendarDays className="h-4 w-4" /> Upcoming Events
             </ButtonLink>

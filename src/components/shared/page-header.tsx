@@ -19,7 +19,7 @@ export function PageHeader({
 }) {
   const crumbs: Crumb[] = breadcrumbs ?? [{ label: "Home", href: "/" }, { label: eyebrow }];
   return (
-    <section className="relative overflow-hidden bg-midnight-950 pb-16 pt-36 text-cream sm:pb-20 sm:pt-44">
+    <section data-nav-over="dark" className="relative overflow-hidden bg-midnight-950 pb-16 pt-36 text-cream sm:pb-20 sm:pt-44">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-midnight-950 via-midnight-900 to-royal-800/60" />
       <div className="pointer-events-none absolute inset-0 bg-radiant opacity-60" />
       <div className="pointer-events-none absolute -right-24 -top-16 text-gold-400/10">

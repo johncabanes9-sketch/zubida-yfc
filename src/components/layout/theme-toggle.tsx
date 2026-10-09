@@ -10,7 +10,7 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-      className="relative grid h-10 w-10 place-items-center rounded-full border border-black/10 text-midnight transition-colors hover:bg-black/5 dark:border-white/15 dark:text-cream dark:hover:bg-white/10"
+      className="relative grid h-10 w-10 place-items-center rounded-full border border-[color:var(--nav-control-border)] text-[color:var(--nav-control)] transition-colors hover:bg-[color:var(--nav-control-hover)]"
     >
       <motion.span
         key={theme}
